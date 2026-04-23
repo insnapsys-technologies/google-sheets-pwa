@@ -1,26 +1,161 @@
 @import "tailwindcss";
 
-:root {
+/* ─── Theme 1: Brutalist ─── */
+:root,
+:root[data-theme="brutalist"] {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #000000;
+  --muted: #555555;
+  --border: #000000;
+  --border-thick: 3px solid #000000;
+  --card: #ffffff;
+  --card-hover: #f0f0f0;
+  --accent: #FF2D7B;
+  --accent-foreground: #ffffff;
+  --neon-blue: #0055FF;
+  --font-mono: var(--font-jetbrains);
+  --card-radius: 0px;
+  --card-blur: none;
+  --card-shadow: none;
+  --nav-bg: #ffffff;
+  --nav-blur: none;
+  --nav-border: 3px solid #000000;
+  --pill-radius: 0px;
+  --input-radius: 0px;
+  --transition-speed: 100ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="brutalist"] {
+    --background: #000000;
+    --foreground: #ffffff;
+    --muted: #999999;
+    --border: #ffffff;
+    --border-thick: 3px solid #ffffff;
+    --card: #0a0a0a;
+    --card-hover: #1a1a1a;
+    --neon-blue: #3388FF;
+    --nav-bg: #000000;
+    --nav-border: 3px solid #ffffff;
+  }
+}
+
+/* ─── Theme 2: Glassmorphism ─── */
+:root[data-theme="glass"] {
+  --background: #0A0F2B;
+  --foreground: #E8E8F0;
+  --muted: #7B7BA0;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-thick: 1px solid rgba(255, 255, 255, 0.1);
+  --card: rgba(255, 255, 255, 0.04);
+  --card-hover: rgba(255, 255, 255, 0.08);
+  --accent: #C850C0;
+  --accent-foreground: #ffffff;
+  --neon-blue: #7B61FF;
+  --font-mono: var(--font-jetbrains);
+  --card-radius: 16px;
+  --card-blur: blur(20px) saturate(1.5);
+  --card-shadow: 0 4px 30px rgba(123, 97, 255, 0.06);
+  --nav-bg: rgba(10, 15, 43, 0.8);
+  --nav-blur: blur(16px);
+  --nav-border: 1px solid rgba(255, 255, 255, 0.06);
+  --pill-radius: 9999px;
+  --input-radius: 12px;
+  --transition-speed: 300ms;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-inter);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  transition: background var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+
+/* Glass ambient background glow */
+[data-theme="glass"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(123, 97, 255, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(200, 80, 192, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 60% 80%, rgba(123, 97, 255, 0.04) 0%, transparent 40%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Themed text utilities ─── */
+.t-upper {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+[data-theme="glass"] .t-upper {
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.t-title {
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
+[data-theme="glass"] .t-title {
+  text-transform: none;
+  letter-spacing: -0.03em;
+}
+
+/* Hide scrollbar on tab bar */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ─── Card hover states ─── */
+.dir-card,
+.blog-card {
+  transition: background var(--transition-speed) ease,
+              border-color var(--transition-speed) ease,
+              box-shadow var(--transition-speed) ease,
+              transform var(--transition-speed) ease;
+}
+
+.dir-card:hover,
+.blog-card:hover {
+  background: var(--card-hover) !important;
+}
+
+[data-theme="brutalist"] .dir-card:hover,
+[data-theme="brutalist"] .blog-card:hover {
+  border-color: var(--neon-blue) !important;
+}
+
+[data-theme="glass"] .dir-card:hover,
+[data-theme="glass"] .blog-card:hover {
+  border-color: rgba(123, 97, 255, 0.25) !important;
+  box-shadow: 0 8px 40px rgba(200, 80, 192, 0.15), 0 0 0 1px rgba(123, 97, 255, 0.15) !important;
+  transform: translateY(-2px);
+}
+
+/* Glass focus ring */
+[data-theme="glass"] input:focus,
+[data-theme="glass"] button:focus-visible {
+  outline: 2px solid var(--neon-blue);
+  outline-offset: 2px;
+}
+
+/* ─── Bottom sheet backdrop ─── */
+[data-theme="glass"] .sheet-cta:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 0 20px rgba(200, 80, 192, 0.3);
+}
+[data-theme="brutalist"] .sheet-cta:hover {
+  filter: brightness(0.9);
 }
