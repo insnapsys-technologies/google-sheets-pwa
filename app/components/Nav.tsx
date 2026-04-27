@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useTheme } from './ThemeProvider'
+// import { useTheme } from './ThemeProvider'
 
 const navLinks = [
   { href: '/', label: 'Directory' },
@@ -10,7 +10,7 @@ const navLinks = [
 
 export default function Nav() {
   const pathname = usePathname()
-  const { theme, toggle } = useTheme()
+  // const { theme, toggle } = useTheme()
 
   return (
     <nav
@@ -51,7 +51,8 @@ export default function Nav() {
               </Link>
             )
           })}
-          <button
+          {/* Theme toggle disabled — black glass only */}
+          {/* <button
             onClick={toggle}
             className="ml-2 flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold t-upper cursor-pointer"
             style={{
@@ -79,7 +80,7 @@ export default function Nav() {
                 Brutal
               </>
             )}
-          </button>
+          </button> */}
         </div>
       </div>
     </nav>

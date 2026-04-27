@@ -46,13 +46,13 @@ export default function CategoryGrid({ tabs }: Props) {
                 <div
                   className="p-5 flex flex-col gap-3"
                   style={{
+                    minHeight: '150px',
                     background: 'var(--card)',
                     border: 'var(--border-thick)',
                     borderRadius: 'var(--card-radius)',
                     backdropFilter: 'var(--card-blur)',
                     WebkitBackdropFilter: 'var(--card-blur)',
                     boxShadow: 'var(--card-shadow)',
-                    minHeight: '130px',
                     transition: 'transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease',
                   }}
                 >

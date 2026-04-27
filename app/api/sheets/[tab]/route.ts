@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchSheetWithLinks } from "@/lib/sheets";
+import { fetchSheetWithLinks, HIDDEN_TABS } from "@/lib/sheets";
 
 export const revalidate = 30;
 
@@ -8,6 +8,10 @@ export async function GET(
   { params }: { params: Promise<{ tab: string }> }
 ) {
   const { tab } = await params;
+
+  if (HIDDEN_TABS.includes(tab)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   try {
     const { values, hyperlinks } = await fetchSheetWithLinks(tab);

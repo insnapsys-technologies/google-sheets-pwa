@@ -3,8 +3,6 @@ import CategoryGrid from './components/CategoryGrid'
 
 export const revalidate = 30
 
-const BLOG_TAB = process.env.BLOG_TAB_NAME || 'Blog'
-
 export default async function Page() {
   let tabs: string[] = []
 
@@ -14,7 +12,5 @@ export default async function Page() {
     console.error('Failed to load sheet tabs:', e)
   }
 
-  const directoryTabs = tabs.filter((t) => t !== BLOG_TAB)
-
-  return <CategoryGrid tabs={directoryTabs} />
+  return <CategoryGrid tabs={tabs} />
 }

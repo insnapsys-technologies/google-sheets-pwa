@@ -1,5 +1,8 @@
 import { google } from "googleapis";
 
+/** Tabs that must never be exposed in listings or data APIs */
+export const HIDDEN_TABS = ['Newsletter Subscribers'];
+
 export interface BlogPost {
   title: string;
   slug: string;
@@ -17,7 +20,8 @@ export const getSheetTabs = async (): Promise<string[]> => {
   return (
     res.data.sheets
       ?.map((s) => s.properties?.title)
-      .filter((t): t is string => Boolean(t)) ?? []
+      .filter((t): t is string => Boolean(t))
+      .filter((t) => !HIDDEN_TABS.includes(t)) ?? []
   );
 };
 
@@ -75,24 +79,28 @@ export const fetchSheetWithLinks = async (
 
 const BLOG_TAB = process.env.BLOG_TAB_NAME || "Blog";
 
-export const fetchBlogPosts = async (): Promise<BlogPost[]> => {
-  const raw = await fetchSheet(BLOG_TAB);
+export const fetchBlogPosts = async (tabName?: string): Promise<BlogPost[]> => {
+  const raw = await fetchSheet(tabName || BLOG_TAB);
   if (raw.length < 2) return [];
 
   const headers = raw[0].map((h: string) => h.trim().toLowerCase());
-  const titleIdx = headers.findIndex((h: string) => h === "title");
+  const titleIdx = headers.findIndex((h: string) => /^title$/i.test(h) || /^post.?title/i.test(h));
   const slugIdx = headers.findIndex((h: string) => h === "slug");
   const dateIdx = headers.findIndex((h: string) => /date|published/i.test(h));
   const contentIdx = headers.findIndex((h: string) => /content|body/i.test(h));
   const imageIdx = headers.findIndex((h: string) => /image|featured/i.test(h));
   const tagsIdx = headers.findIndex((h: string) => /tags?|categor/i.test(h));
 
+  // If no slug column, auto-generate from title
+  const makeSlug = (title: string) =>
+    title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
   return raw
     .slice(1)
-    .filter((row: string[]) => row[titleIdx] && row[slugIdx])
+    .filter((row: string[]) => row[titleIdx])
     .map((row: string[]) => ({
       title: row[titleIdx] || "",
-      slug: row[slugIdx] || "",
+      slug: (slugIdx >= 0 && row[slugIdx]) ? row[slugIdx] : makeSlug(row[titleIdx] || ""),
       date: row[dateIdx] || "",
       content: row[contentIdx] || "",
       image: row[imageIdx] || "",
