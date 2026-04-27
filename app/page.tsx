@@ -1,16 +1,20 @@
 ﻿import { getSheetTabs } from '@/lib/sheets'
-import DirectoryClient from './components/DirectoryClient'
+import CategoryGrid from './components/CategoryGrid'
 
-export const revalidate = 30;
+export const revalidate = 30
+
+const BLOG_TAB = process.env.BLOG_TAB_NAME || 'Blog'
 
 export default async function Page() {
   let tabs: string[] = []
-  
+
   try {
     tabs = await getSheetTabs()
   } catch (e) {
     console.error('Failed to load sheet tabs:', e)
   }
 
-  return <DirectoryClient initialTabs={tabs} />
+  const directoryTabs = tabs.filter((t) => t !== BLOG_TAB)
+
+  return <CategoryGrid tabs={directoryTabs} />
 }

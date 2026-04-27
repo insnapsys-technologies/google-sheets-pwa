@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchSheet } from "@/lib/sheets";
+import { fetchSheetWithLinks } from "@/lib/sheets";
 
 export const revalidate = 30;
 
@@ -10,8 +10,8 @@ export async function GET(
   const { tab } = await params;
 
   try {
-    const data = await fetchSheet(tab);
-    return NextResponse.json({ data });
+    const { values, hyperlinks } = await fetchSheetWithLinks(tab);
+    return NextResponse.json({ data: values, hyperlinks });
   } catch (error) {
     console.error("Error fetching sheet:", error);
     return NextResponse.json(

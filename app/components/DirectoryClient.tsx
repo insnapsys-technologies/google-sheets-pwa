@@ -1,70 +1,97 @@
-'use client'
+﻿'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import BottomSheet from './BottomSheet'
+import React, { useState, useMemo } from 'react'
+import Link from 'next/link'
+import type { DirectoryClientProps } from './directory/types'
+import { useSheetData, generateTableName } from './directory/useSheetData'
+import ContentView from './directory/ContentView'
+import CardsGrid from './directory/CardsGrid'
 
-type Row = string[]
+const ADDRESS_RE = /address|location|city|state|region/i
 
-interface Props {
-  initialTabs: string[]
-}
-
-interface SelectedCard {
-  name: string | null
-  logo: string | null
-  url: string | null
-  fields: { label: string; value: string }[]
-}
-
-export default function DirectoryClient({ initialTabs }: Props) {
-  const [activeTab, setActiveTab] = useState(initialTabs[0] ?? '')
-  const [headers, setHeaders] = useState<string[]>([])
-  const [rows, setRows] = useState<Row[]>([])
-  const [loading, setLoading] = useState(false)
+export default function DirectoryClient({ tab }: DirectoryClientProps) {
   const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<SelectedCard | null>(null)
+  const [activeTableIdx, setActiveTableIdx] = useState<number | null>(null)
+  const [locationFilter, setLocationFilter] = useState('')
 
-  useEffect(() => {
-    if (!activeTab) return
-    setLoading(true)
-    setRows([])
-    setHeaders([])
-    fetch(`/api/sheets/${encodeURIComponent(activeTab)}`)
-      .then((r) => r.json())
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setHeaders(data[0])
-          setRows(data.slice(1))
+  // Single-column content view: only plain text + hyperlinks, no card grid
+  const isContentView = tab.toLowerCase().startsWith('independent pigment mixer')
+
+  const { records, tables, loading } = useSheetData(tab, isContentView)
+
+  // Derive location column name + values grouped by country (parsed from "City, Country" format)
+  const { locationColName, locationGroups } = useMemo(() => {
+    for (const rec of records) {
+      const idx = rec.headers.findIndex((h) => ADDRESS_RE.test(String(h).trim()))
+      if (idx >= 0) {
+        const colName = rec.headers[idx]
+        const allValues = Array.from(
+          new Set(
+            records
+              .map((r) => {
+                const ci = r.headers.findIndex((h) => ADDRESS_RE.test(String(h).trim()))
+                return ci >= 0 ? String(r.row[ci] ?? '').trim() : ''
+              })
+              .filter(Boolean)
+          )
+        ).sort()
+
+        const grouped: Record<string, string[]> = {}
+        for (const val of allValues) {
+          const parts = val.split(',').map((p) => p.trim()).filter(Boolean)
+          const country = parts.length >= 2 ? parts[0] : ''
+          const key = country || '__ungrouped__'
+          if (!grouped[key]) grouped[key] = []
+          grouped[key].push(val)
         }
-      })
-      .finally(() => setLoading(false))
-  }, [activeTab])
 
-  useEffect(() => {
-  if ('serviceWorker' in navigator && 'PushManager' in window) {
-    navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
-  }
-}, [])
+        const groups = Object.entries(grouped)
+          .sort(([a], [b]) => {
+            if (a === '__ungrouped__') return 1
+            if (b === '__ungrouped__') return -1
+            return a.localeCompare(b)
+          })
+          .map(([country, values]) => ({
+            country: country === '__ungrouped__' ? '' : country,
+            values,
+          }))
 
-  // Detect special column indices by header name
-  const nameIdx = headers.findIndex((h) => /^name$/i.test(h.trim()))
-  const logoIdx = headers.findIndex((h) => /logo|image|icon/i.test(h))
-  const urlIdx = headers.findIndex((h) => /url|link|website/i.test(h))
+        return { locationColName: colName, locationGroups: groups }
+      }
+    }
+    return {
+      locationColName: null as string | null,
+      locationGroups: [] as { country: string; values: string[] }[],
+    }
+  }, [records])
+
+  // Filter/search over per-row records AND by selected table + location
   const filtered = useMemo(() => {
-    const q = search.toLowerCase()
-    return rows.filter((row) => {
-      return q === '' || row.some((cell) => cell?.toLowerCase().includes(q))
-    })
-  }, [rows, search])
+    let result = records
 
-  const handleTabClick = useCallback((tab: string) => {
-    setActiveTab(tab)
-    setSearch('')
-  }, [])
+    if (activeTableIdx !== null && tables.length > 0) {
+      const selectedTable = tables[activeTableIdx]
+      result = result.filter(
+        (rec) => JSON.stringify(rec.headers) === JSON.stringify(selectedTable.headers)
+      )
+    }
+
+    if (locationFilter) {
+      result = result.filter((rec) => {
+        const ci = rec.headers.findIndex((h) => ADDRESS_RE.test(String(h).trim()))
+        return ci >= 0 && String(rec.row[ci] ?? '').trim() === locationFilter
+      })
+    }
+
+    const q = search.toLowerCase()
+    return result.filter(({ row }) =>
+      q === '' || row.some((cell) => String(cell ?? '').toLowerCase().includes(q))
+    )
+  }, [records, search, activeTableIdx, tables, locationFilter])
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--background)' }}>
-      {/* Tab bar — underlined style */}
+      {/* Category header with back link */}
       <div
         className="sticky top-14 z-10"
         style={{
@@ -75,32 +102,26 @@ export default function DirectoryClient({ initialTabs }: Props) {
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-0 overflow-x-auto scrollbar-none -mx-4 px-4 sm:-mx-6 sm:px-6">
-              {initialTabs.map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => handleTabClick(tab)}
-                  className="px-4 py-3 text-xs font-bold t-upper whitespace-nowrap"
-                  style={{
-                    color:
-                      activeTab === tab
-                        ? 'var(--foreground)'
-                        : 'var(--muted)',
-                    borderBottom:
-                      activeTab === tab
-                        ? '2px solid var(--neon-blue)'
-                        : '2px solid transparent',
-                    transition: 'color var(--transition-speed) ease, border-color var(--transition-speed) ease',
-                  }}
-                >
-                  {tab}
-                </button>
-              ))}
+          <div className="flex items-center justify-between h-11">
+            <div className="flex items-center gap-3">
+              <Link
+                href="/"
+                className="flex items-center gap-1 text-xs font-bold t-upper"
+                style={{ color: 'var(--muted)', transition: 'color var(--transition-speed) ease' }}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+                All
+              </Link>
+              <span style={{ color: 'var(--border)' }}>{'/'}</span>
+              <span className="text-xs font-bold t-upper" style={{ color: 'var(--foreground)' }}>
+                {tab}
+              </span>
             </div>
             {!loading && filtered.length > 0 && (
               <span
-                className="text-xs tabular-nums ml-3 flex-shrink-0"
+                className="text-xs tabular-nums"
                 style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}
               >
                 {filtered.length} {filtered.length === 1 ? 'result' : 'results'}
@@ -111,9 +132,10 @@ export default function DirectoryClient({ initialTabs }: Props) {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Search bar */}
-        <div className="mb-6">
-          <div className="relative max-w-md">
+        {/* Search bar and table filter - side by side */}
+        <div className="mb-6 flex gap-3 flex-wrap items-end">
+          {/* Search bar */}
+          <div className="relative flex-1 min-w-xs max-w-md">
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
               style={{ color: 'var(--muted)' }}
@@ -130,7 +152,7 @@ export default function DirectoryClient({ initialTabs }: Props) {
             </svg>
             <input
               type="search"
-              placeholder={`Search ${activeTab}…`}
+              placeholder={`Search ${tab}…`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 text-sm focus:outline-none"
@@ -145,6 +167,111 @@ export default function DirectoryClient({ initialTabs }: Props) {
               }}
             />
           </div>
+
+          {/* Location filter dropdown — shown only when an address-like column exists */}
+          {!isContentView && locationGroups.length > 0 && (
+          <div className="relative">
+            <select
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              disabled={loading}
+              className="px-3 py-2.5 pr-8 text-sm font-bold focus:outline-none appearance-none"
+              style={{
+                background: 'var(--background)',
+                color: 'var(--foreground)',
+                border: 'var(--border-thick)',
+                borderRadius: 'var(--input-radius)',
+                backdropFilter: 'var(--card-blur)',
+                WebkitBackdropFilter: 'var(--card-blur)',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              <option value="" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+                All {locationColName ?? 'Locations'}
+              </option>
+              {locationGroups.map(({ country, values }) =>
+                country ? (
+                  <optgroup key={country} label={country}>
+                    {values.map((val) => {
+                      const area = val.split(',').slice(1).join(',').trim()
+                      return (
+                        <option key={val} value={val} style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+                          {area || val}
+                        </option>
+                      )
+                    })}
+                  </optgroup>
+                ) : (
+                  values.map((val) => (
+                    <option key={val} value={val} style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+                      {val}
+                    </option>
+                  ))
+                )
+              )}
+            </select>
+            {/* Custom dropdown arrow */}
+            <svg
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+              style={{ color: 'var(--foreground)' }}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          </div>
+          )}
+
+          {/* Table filter dropdown — hidden for single-column content tabs */}
+          {!isContentView && (
+          <div className="relative">
+            <select
+              value={tables.length === 0 ? 'all' : activeTableIdx === null ? 'all' : String(activeTableIdx)}
+              onChange={(e) =>
+                setActiveTableIdx(e.target.value === 'all' ? null : parseInt(e.target.value))
+              }
+              disabled={loading || tables.length === 0}
+              className="px-3 py-2.5 pr-8 text-sm font-bold focus:outline-none appearance-none"
+              style={{
+                background: 'var(--background)',
+                color: 'var(--foreground)',
+                border: 'var(--border-thick)',
+                borderRadius: 'var(--input-radius)',
+                backdropFilter: 'var(--card-blur)',
+                WebkitBackdropFilter: 'var(--card-blur)',
+                cursor: loading || tables.length === 0 ? 'not-allowed' : 'pointer',
+                opacity: loading || tables.length === 0 ? 0.7 : 1,
+              }}
+            >
+              {loading && <option value="all" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>Loading tables...</option>}
+              {!loading && tables.length === 0 && <option value="all" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>No tables found</option>}
+              {!loading && tables.length > 0 && <option value="all" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>All Records</option>}
+              {!loading && tables.map((table, idx) => (
+                <option key={idx} value={String(idx)} style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+                  {generateTableName(table.headers)}
+                </option>
+              ))}
+            </select>
+            {/* Custom dropdown arrow */}
+            <svg
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+              style={{ color: 'var(--foreground)' }}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19 14l-7 7m0 0l-7-7m7 7V3"
+              />
+            </svg>
+          </div>
+          )} {/* end !isContentView table filter */}
         </div>
 
         {/* Loading skeleton */}
@@ -185,134 +312,14 @@ export default function DirectoryClient({ initialTabs }: Props) {
           </div>
         )}
 
+        {/* Document view for single-column compliance/content tabs */}
+        {!loading && isContentView && filtered.length > 0 && (
+          <ContentView records={filtered} />
+        )}
+
         {/* Cards grid */}
-        {!loading && filtered.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {filtered.map((row, i) => {
-              const name = nameIdx >= 0 ? row[nameIdx] : row[0]
-              const logo = logoIdx >= 0 ? row[logoIdx] : null
-              const url = urlIdx >= 0 ? row[urlIdx] : null
-
-              const otherFields = headers
-                .map((h, idx) => ({ label: h, value: row[idx] }))
-                .filter(
-                  (_, idx) =>
-                    idx !== nameIdx && idx !== logoIdx && idx !== urlIdx
-                )
-                .filter((f) => f.value)
-
-              return (
-                <div
-                  key={i}
-                  className="h-full"
-                  onClick={() =>
-                    setSelected({ name, logo, url, fields: otherFields })
-                  }
-                >
-                  <div
-                    className="dir-card group p-5 flex flex-col gap-3 h-full cursor-pointer"
-                    style={{
-                      background: 'var(--card)',
-                      border: 'var(--border-thick)',
-                      borderRadius: 'var(--card-radius)',
-                      backdropFilter: 'var(--card-blur)',
-                      WebkitBackdropFilter: 'var(--card-blur)',
-                      boxShadow: 'var(--card-shadow)',
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      {logo ? (
-                        <img
-                          src={logo}
-                          alt={name ?? ''}
-                          width={40}
-                          height={40}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-10 h-10 object-contain flex-shrink-0"
-                          style={{
-                            background: 'var(--background)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 'calc(var(--card-radius) / 2)',
-                          }}
-                          onError={(e) => {
-                            const img = e.target as HTMLImageElement
-                            img.style.display = 'none'
-                            const fallback = img.nextElementSibling as HTMLElement
-                            if (fallback) fallback.style.display = 'flex'
-                          }}
-                        />
-                      ) : null}
-                      <div
-                        className="w-10 h-10 flex-shrink-0 items-center justify-center font-black text-sm"
-                        style={{
-                          display: logo ? 'none' : 'flex',
-                          background: 'var(--background)',
-                          color: 'var(--foreground)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'calc(var(--card-radius) / 2)',
-                        }}
-                      >
-                        {name?.[0]?.toUpperCase() ?? '?'}
-                      </div>
-                      <h3
-                        className="font-bold text-sm leading-snug line-clamp-2 t-title"
-                        style={{ color: 'var(--foreground)' }}
-                      >
-                        {name}
-                      </h3>
-                    </div>
-
-                    <div className="flex-1 space-y-1.5">
-                      {otherFields.slice(0, 3).map((f) => (
-                        <p
-                          key={f.label}
-                          className="text-xs line-clamp-1"
-                          style={{
-                            color: 'var(--muted)',
-                            fontFamily: 'var(--font-mono)',
-                          }}
-                        >
-                          <span
-                            className="font-bold t-upper"
-                            style={{ color: 'var(--foreground)' }}
-                          >
-                            {f.label}:{' '}
-                          </span>
-                          {f.value}
-                        </p>
-                      ))}
-                    </div>
-
-                    {url && (
-                      <button  onClick={(e)=>{e.preventDefault(); e.stopPropagation(); window.open(url, '_blank') }} className="flex items-center gap-1.5 pt-1">
-                        <svg
-                          className="w-3.5 h-3.5"
-                          style={{ color: 'var(--neon-blue)' }}
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2.5}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M14 3h7m0 0v7m0-7L10 14"
-                          />
-                        </svg>
-                        <span
-                          className="text-[10px] t-upper font-bold underline"
-                          style={{ color: 'var(--neon-blue)' }}
-                        >
-                          Visit
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+        {!loading && !isContentView && filtered.length > 0 && (
+          <CardsGrid records={filtered} />
         )}
 
         {/* Empty state */}
@@ -338,12 +345,15 @@ export default function DirectoryClient({ initialTabs }: Props) {
             >
               {search
                 ? `No results for "${search}"`
-                : `No data in "${activeTab}"`}
+                : locationFilter
+                ? `No results in "${locationFilter}"`
+                : `No data in "${tab}"`}
             </p>
-            {search && (
+            {(search || locationFilter) && (
               <button
                 onClick={() => {
                   setSearch('')
+                  setLocationFilter('')
                 }}
                 className="text-xs font-bold t-upper px-4 py-2"
                 style={{
@@ -361,14 +371,6 @@ export default function DirectoryClient({ initialTabs }: Props) {
         )}
       </main>
 
-      <BottomSheet
-        open={selected !== null}
-        onClose={() => setSelected(null)}
-        name={selected?.name ?? null}
-        logo={selected?.logo ?? null}
-        url={selected?.url ?? null}
-        fields={selected?.fields ?? []}
-      />
     </div>
   )
 }

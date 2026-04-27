@@ -43,6 +43,36 @@ export const fetchSheet = async (range: string) => {
   return res.data.values || [];
 };
 
+/**
+ * Fetches sheet data together with per-cell hyperlink URLs.
+ * Uses spreadsheets.get with includeGridData so that the `hyperlink`
+ * field (populated when a cell contains a HYPERLINK formula or was
+ * linked via Insert > Link) is returned alongside the display value.
+ */
+export const fetchSheetWithLinks = async (
+  range: string
+): Promise<{ values: (string | null)[][]; hyperlinks: (string | null)[][] }> => {
+  const sheets = getSheetsClient();
+
+  const res = await sheets.spreadsheets.get({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID!,
+    ranges: [range],
+    includeGridData: true,
+  });
+
+  const rowData = res.data.sheets?.[0]?.data?.[0]?.rowData ?? [];
+  const values: (string | null)[][] = [];
+  const hyperlinks: (string | null)[][] = [];
+
+  for (const row of rowData) {
+    const cells = row.values ?? [];
+    values.push(cells.map((c) => c.formattedValue ?? null));
+    hyperlinks.push(cells.map((c) => c.hyperlink ?? null));
+  }
+
+  return { values, hyperlinks };
+};
+
 const BLOG_TAB = process.env.BLOG_TAB_NAME || "Blog";
 
 export const fetchBlogPosts = async (): Promise<BlogPost[]> => {

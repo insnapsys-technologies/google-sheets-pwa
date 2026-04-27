@@ -190,30 +190,75 @@ export default function BottomSheet({ open, onClose, name, logo, url, fields }: 
             {/* Metadata fields */}
             {metaFields.length > 0 && (
               <div className="grid grid-cols-2 gap-3 mb-5">
-                {metaFields.map((f) => (
-                  <div
-                    key={f.label}
-                    className="p-3"
-                    style={{
-                      background: 'var(--card)',
-                      border: 'var(--border-thick)',
-                      borderRadius: 'var(--card-radius)',
-                    }}
-                  >
-                    <p
-                      className="text-[10px] font-bold t-upper mb-1"
-                      style={{ color: 'var(--muted)' }}
+                {metaFields.map((f) => {
+                  const isInsta = /instagram|insta|social/i.test(f.label)
+                  if (isInsta) {
+                    const handles = String(f.value ?? '')
+                      .split(/[\s,;\/\n]+/)
+                      .map((h) => h.trim())
+                      .filter(Boolean)
+                      .map((h) => h.replace(/^@/, ''))
+                      .filter(Boolean)
+                    return (
+                      <div
+                        key={f.label}
+                        className="p-3"
+                        style={{
+                          background: 'var(--card)',
+                          border: 'var(--border-thick)',
+                          borderRadius: 'var(--card-radius)',
+                        }}
+                      >
+                        <p className="text-[10px] font-bold t-upper mb-2" style={{ color: 'var(--muted)' }}>
+                          {f.label}
+                        </p>
+                        <div className="flex flex-col gap-1">
+                          {handles.map((h, i) => (
+                            <a
+                              key={i}
+                              href={`https://instagram.com/${h}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-sm font-bold"
+                              style={{ color: '#E1306C', textDecoration: 'none' }}
+                            >
+                              <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                                <circle cx="12" cy="12" r="4" />
+                                <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+                              </svg>
+                              @{h}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div
+                      key={f.label}
+                      className="p-3"
+                      style={{
+                        background: 'var(--card)',
+                        border: 'var(--border-thick)',
+                        borderRadius: 'var(--card-radius)',
+                      }}
                     >
-                      {f.label}
-                    </p>
-                    <p
-                      className="text-sm font-bold line-clamp-2"
-                      style={{ color: 'var(--foreground)', fontFamily: 'var(--font-mono)' }}
-                    >
-                      {f.value}
-                    </p>
-                  </div>
-                ))}
+                      <p
+                        className="text-[10px] font-bold t-upper mb-1"
+                        style={{ color: 'var(--muted)' }}
+                      >
+                        {f.label}
+                      </p>
+                      <p
+                        className="text-sm font-bold line-clamp-2"
+                        style={{ color: 'var(--foreground)', fontFamily: 'var(--font-mono)' }}
+                      >
+                        {f.value}
+                      </p>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

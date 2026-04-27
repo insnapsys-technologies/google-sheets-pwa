@@ -6,7 +6,6 @@ import { useTheme } from './ThemeProvider'
 
 const navLinks = [
   { href: '/', label: 'Directory' },
-  { href: '/blog', label: 'Blog' },
 ]
 
 export default function Nav() {
@@ -29,7 +28,7 @@ export default function Nav() {
           className="text-base font-black t-title"
           style={{ color: 'var(--foreground)' }}
         >
-          Directory
+          True Line
         </Link>
         <div className="flex items-center gap-4">
           {navLinks.map(({ href, label }) => {
