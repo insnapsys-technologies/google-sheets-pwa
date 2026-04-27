@@ -12,19 +12,6 @@ export default function manifest(): MetadataRoute.Manifest {
     display_override: ['standalone', 'window-controls-overlay'],
     background_color: '#fafafa',
     theme_color: '#18181b',
-    screenshots: [
-    {
-      src: '/android/launchericon-512x512.png',
-      sizes: "1280x720",
-      type: "image/png",
-      form_factor: "wide"
-    },
-    {
-      src: '/android/launchericon-512x512.png',
-      sizes: "390x844",
-      type: "image/png"
-    }
-  ],
     icons: [
       {
         src: '/android/launchericon-48x48.png',
@@ -57,6 +44,12 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any',
+      },
+      {
+        src: '/android/launchericon-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
       },
       {
         src: '/ios/180.png',
