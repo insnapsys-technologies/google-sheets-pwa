@@ -1,8 +1,12 @@
-const CACHE_NAME = 'directory-v2'
+const CACHE_NAME = 'directory-v3'
 const API_CACHE_NAME = 'api-data-v1'
-const SHELL_ASSETS = ['/', '/blog']
 
-// Install: pre-cache the app shell
+// Minimal shell (Next handles rest dynamically)
+const SHELL_ASSETS = ['/', '/blog', '/manifest.json']
+
+// --------------------
+// INSTALL
+// --------------------
 self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function (cache) {
@@ -12,7 +16,9 @@ self.addEventListener('install', function (event) {
   self.skipWaiting()
 })
 
-// Activate: clean up old caches (including previous directory-v1)
+// --------------------
+// ACTIVATE
+// --------------------
 self.addEventListener('activate', function (event) {
   event.waitUntil(
     caches.keys().then(function (keys) {
@@ -30,6 +36,9 @@ self.addEventListener('activate', function (event) {
   self.clients.claim()
 })
 
+// --------------------
+// PUSH NOTIFICATIONS
+// --------------------
 self.addEventListener('push', function (event) {
   if (event.data) {
     const data = event.data.json()
@@ -48,76 +57,115 @@ self.addEventListener('push', function (event) {
 })
 
 self.addEventListener('notificationclick', function (event) {
-  console.log('Notification click received.')
   event.notification.close()
   event.waitUntil(clients.openWindow('/'))
 })
 
+// --------------------
+// FETCH HANDLER
+// --------------------
 self.addEventListener('fetch', function (event) {
-  const url = new URL(event.request.url)
+  const request = event.request
+  const url = new URL(request.url)
 
-  // Stale-While-Revalidate for API calls:
-  // 1. Respond with cached data immediately (if available)
-  // 2. Always fetch network in parallel → update cache → notify clients
+  // Normalize URL (prevents duplicate cache entries)
+  url.searchParams.sort()
+  const normalizedRequest = new Request(url.toString(), {
+    method: request.method,
+    headers: request.headers,
+    credentials: request.credentials,
+  })
+
+  // --------------------
+  // 1. NEXT DATA (CRITICAL FIX)
+  // --------------------
+  if (url.pathname.startsWith('/_next/data/')) {
+    event.respondWith(
+      caches.match(normalizedRequest).then(function (cached) {
+        const networkFetch = fetch(normalizedRequest)
+          .then(function (response) {
+            if (response && response.ok) {
+              const clone = response.clone()
+              caches.open(API_CACHE_NAME).then(function (cache) {
+                cache.put(normalizedRequest, clone)
+              })
+            }
+            return response
+          })
+          .catch(function () {
+            return cached
+          })
+
+        return cached || networkFetch
+      })
+    )
+    return
+  }
+
+  // --------------------
+  // 2. API (SWR)
+  // --------------------
   if (url.pathname.startsWith('/api/')) {
-    const request = event.request
+    const networkFetch = fetch(normalizedRequest)
 
-    // Start network fetch immediately — runs in parallel with cache lookup
-    const networkFetch = fetch(request.clone())
-
-    // Background pipeline: cache the fresh response, then postMessage all clients
     const bgUpdate = networkFetch
       .then(function (response) {
-        if (!response.ok) return
+        if (!response || !response.ok) return
+
         return caches
           .open(API_CACHE_NAME)
           .then(function (cache) {
-            return cache.put(request, response.clone())
+            return cache.put(normalizedRequest, response.clone())
           })
           .then(function () {
             return self.clients.matchAll()
           })
           .then(function (clients) {
             clients.forEach(function (c) {
-              c.postMessage({ type: 'CACHE_UPDATED', url: request.url })
+              c.postMessage({
+                type: 'CACHE_UPDATED',
+                url: normalizedRequest.url,
+              })
             })
           })
       })
       .catch(function () {})
 
-    // Keep SW alive until cache write + notifications complete
     event.waitUntil(bgUpdate)
 
-    // Respond: cached (stale) immediately, or wait for network if no cache yet
     event.respondWith(
       caches
         .open(API_CACHE_NAME)
         .then(function (cache) {
-          return cache.match(request)
+          return cache.match(normalizedRequest)
         })
         .then(function (cached) {
           return cached || networkFetch
         })
         .catch(function () {
-          return caches.match(request)
+          return new Response(JSON.stringify({ error: 'offline' }), {
+            headers: { 'Content-Type': 'application/json' },
+          })
         })
     )
     return
   }
 
-  // Network-first for page navigations, cache as fallback
-  if (event.request.mode === 'navigate') {
+  // --------------------
+  // 3. NAVIGATION (HTML PAGES)
+  // --------------------
+  if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
+      fetch(request)
         .then(function (response) {
-          var clone = response.clone()
+          const clone = response.clone()
           caches.open(CACHE_NAME).then(function (cache) {
-            cache.put(event.request, clone)
+            cache.put(request, clone)
           })
           return response
         })
         .catch(function () {
-          return caches.match(event.request).then(function (cached) {
+          return caches.match(request).then(function (cached) {
             return cached || caches.match('/')
           })
         })
@@ -125,22 +173,28 @@ self.addEventListener('fetch', function (event) {
     return
   }
 
-  // Cache-first for static assets (JS, CSS, images, fonts)
+  // --------------------
+  // 4. STATIC + NEXT ASSETS
+  // --------------------
   if (
-    url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|gif|webp|woff2?|ttf|ico)$/)
+    url.pathname.startsWith('/_next/') ||
+    url.pathname.match(
+      /\.(js|css|png|jpg|jpeg|svg|gif|webp|woff2?|ttf|ico)$/
+    )
   ) {
     event.respondWith(
-      caches.match(event.request).then(function (cached) {
-        return (
-          cached ||
-          fetch(event.request).then(function (response) {
-            var clone = response.clone()
-            caches.open(CACHE_NAME).then(function (cache) {
-              cache.put(event.request, clone)
-            })
-            return response
+      caches.match(request).then(function (cached) {
+        if (cached) return cached
+
+        return fetch(request).then(function (response) {
+          if (!response || !response.ok) return response
+
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then(function (cache) {
+            cache.put(request, clone)
           })
-        )
+          return response
+        })
       })
     )
     return
