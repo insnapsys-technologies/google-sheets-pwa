@@ -2,7 +2,7 @@ const CACHE_NAME = 'directory-v3'
 const API_CACHE_NAME = 'api-data-v1'
 
 // Minimal shell (Next handles rest dynamically)
-const SHELL_ASSETS = ['/', '/blog', '/manifest.json']
+const SHELL_ASSETS = ['/']
 
 // --------------------
 // INSTALL
