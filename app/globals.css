@@ -197,3 +197,102 @@ body {
 [data-theme="brutalist"] .sheet-cta:hover {
   filter: brightness(0.9);
 }
+
+/* ─── Splash Screen ─── */
+.splash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.splash-overlay.splash-enter .splash-icon {
+  animation: splash-icon-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.splash-overlay.splash-enter .splash-title {
+  animation: splash-text-in 0.35s ease forwards 0.25s;
+  opacity: 0;
+}
+
+.splash-overlay.splash-enter .splash-bar-fill {
+  animation: splash-bar-grow 0.8s ease forwards 0.45s;
+}
+
+.splash-overlay.splash-exit {
+  animation: splash-fade-out 0.45s ease forwards;
+}
+
+.splash-glow {
+  position: absolute;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 45, 123, 0.28) 0%, transparent 70%);
+  animation: splash-glow-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.splash-icon {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  opacity: 0;
+}
+
+.splash-title {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 1.05rem;
+  letter-spacing: 0.28em;
+  color: #ffffff;
+  margin: 0;
+  position: relative;
+}
+
+.splash-bar {
+  width: 64px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1px;
+  overflow: hidden;
+  position: relative;
+}
+
+.splash-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: #FF2D7B;
+  border-radius: 1px;
+}
+
+@keyframes splash-icon-in {
+  from { opacity: 0; transform: scale(0.82); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes splash-text-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes splash-bar-grow {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+@keyframes splash-glow-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.12); }
+}
+
+@keyframes splash-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}

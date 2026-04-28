@@ -2,16 +2,16 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Directory',
-    short_name: 'Directory',
-    description: 'Company directory and blog powered by Google Sheets',
+    name: 'True line',
+    short_name: 'True line',
+    description: 'True line',
     start_url: '/',
     id: '/',
     scope: '/',
     display: 'standalone',
     display_override: ['standalone', 'window-controls-overlay'],
-    background_color: '#fafafa',
-    theme_color: '#18181b',
+    background_color: '#000000',
+    theme_color: '#000000',
     icons: [
       {
         src: '/android/launchericon-48x48.png',
