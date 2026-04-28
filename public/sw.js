@@ -1,202 +1,154 @@
-const CACHE_NAME = 'directory-v3'
-const API_CACHE_NAME = 'api-data-v1'
+const CACHE_NAME = 'directory-v4'
+const API_CACHE = 'api-data-v2'
 
-// Minimal shell (Next handles rest dynamically)
-const SHELL_ASSETS = ['/']
-
-// --------------------
-// INSTALL
-// --------------------
-self.addEventListener('install', function (event) {
+// ---------- INSTALL (no addAll; never fail) ----------
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(function (cache) {
-      return cache.addAll(SHELL_ASSETS)
+    caches.open(CACHE_NAME).then(async (cache) => {
+      try {
+        const res = await fetch('/', { cache: 'no-store' })
+        if (res && res.ok) await cache.put('/', res.clone())
+      } catch (e) {
+        console.warn('[SW] install: skip caching /', e)
+      }
     })
   )
   self.skipWaiting()
 })
 
-// --------------------
-// ACTIVATE
-// --------------------
-self.addEventListener('activate', function (event) {
+// ---------- ACTIVATE ----------
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(function (keys) {
-      return Promise.all(
+    caches.keys().then((keys) =>
+      Promise.all(
         keys
-          .filter(function (key) {
-            return key !== CACHE_NAME && key !== API_CACHE_NAME
-          })
-          .map(function (key) {
-            return caches.delete(key)
-          })
+          .filter((k) => k !== CACHE_NAME && k !== API_CACHE)
+          .map((k) => caches.delete(k))
       )
-    })
+    )
   )
   self.clients.claim()
 })
 
-// --------------------
-// PUSH NOTIFICATIONS
-// --------------------
-self.addEventListener('push', function (event) {
-  if (event.data) {
-    const data = event.data.json()
-    const options = {
-      body: data.body,
-      icon: data.icon || '/icon.png',
-      badge: '/badge.png',
-      vibrate: [100, 50, 100],
-      data: {
-        dateOfArrival: Date.now(),
-        primaryKey: '2',
-      },
-    }
-    event.waitUntil(self.registration.showNotification(data.title, options))
-  }
-})
+// ---------- FETCH ----------
+self.addEventListener('fetch', (event) => {
+  const req = event.request
+  const url = new URL(req.url)
 
-self.addEventListener('notificationclick', function (event) {
-  event.notification.close()
-  event.waitUntil(clients.openWindow('/'))
-})
-
-// --------------------
-// FETCH HANDLER
-// --------------------
-self.addEventListener('fetch', function (event) {
-  const request = event.request
-  const url = new URL(request.url)
-
-  // Normalize URL (prevents duplicate cache entries)
+  // Normalize query params (avoids duplicate cache keys)
   url.searchParams.sort()
-  const normalizedRequest = new Request(url.toString(), {
-    method: request.method,
-    headers: request.headers,
-    credentials: request.credentials,
+  const normalized = new Request(url.toString(), {
+    method: req.method,
+    headers: req.headers,
+    credentials: req.credentials,
   })
 
-  // --------------------
-  // 1. NEXT DATA (CRITICAL FIX)
-  // --------------------
+  // 1) RSC (Next App Router)  -------------------------
+  if (url.searchParams.has('_rsc')) {
+    event.respondWith(staleWhileRevalidate(normalized, API_CACHE))
+    return
+  }
+
+  // 2) Next data JSON --------------------------------
   if (url.pathname.startsWith('/_next/data/')) {
-    event.respondWith(
-      caches.match(normalizedRequest).then(function (cached) {
-        const networkFetch = fetch(normalizedRequest)
-          .then(function (response) {
-            if (response && response.ok) {
-              const clone = response.clone()
-              caches.open(API_CACHE_NAME).then(function (cache) {
-                cache.put(normalizedRequest, clone)
-              })
-            }
-            return response
-          })
-          .catch(function () {
-            return cached
-          })
-
-        return cached || networkFetch
-      })
-    )
+    event.respondWith(staleWhileRevalidate(normalized, API_CACHE))
     return
   }
 
-  // --------------------
-  // 2. API (SWR)
-  // --------------------
+  // 3) Your API --------------------------------------
   if (url.pathname.startsWith('/api/')) {
-    const networkFetch = fetch(normalizedRequest)
+    event.respondWith(staleWhileRevalidate(normalized, API_CACHE, true))
+    return
+  }
 
-    const bgUpdate = networkFetch
-      .then(function (response) {
-        if (!response || !response.ok) return
-
-        return caches
-          .open(API_CACHE_NAME)
-          .then(function (cache) {
-            return cache.put(normalizedRequest, response.clone())
-          })
-          .then(function () {
-            return self.clients.matchAll()
-          })
-          .then(function (clients) {
-            clients.forEach(function (c) {
-              c.postMessage({
-                type: 'CACHE_UPDATED',
-                url: normalizedRequest.url,
-              })
+  // 4) Navigation (HTML) ------------------------------
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          const clone = res.clone()
+          caches.open(CACHE_NAME).then((c) => c.put(req, clone))
+          return res
+        })
+        .catch(async () => {
+          // Always return app shell
+          const cache = await caches.open(CACHE_NAME)
+          return (
+            (await cache.match('/')) ||
+            new Response('<h1>Offline</h1>', {
+              headers: { 'Content-Type': 'text/html' },
             })
-          })
-      })
-      .catch(function () {})
-
-    event.waitUntil(bgUpdate)
-
-    event.respondWith(
-      caches
-        .open(API_CACHE_NAME)
-        .then(function (cache) {
-          return cache.match(normalizedRequest)
-        })
-        .then(function (cached) {
-          return cached || networkFetch
-        })
-        .catch(function () {
-          return new Response(JSON.stringify({ error: 'offline' }), {
-            headers: { 'Content-Type': 'application/json' },
-          })
+          )
         })
     )
     return
   }
 
-  // --------------------
-  // 3. NAVIGATION (HTML PAGES)
-  // --------------------
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then(function (response) {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then(function (cache) {
-            cache.put(request, clone)
-          })
-          return response
-        })
-        .catch(function () {
-          return caches.match(request).then(function (cached) {
-            return cached || caches.match('/')
-          })
-        })
-    )
-    return
-  }
-
-  // --------------------
-  // 4. STATIC + NEXT ASSETS
-  // --------------------
+  // 5) Static + Next assets ---------------------------
   if (
     url.pathname.startsWith('/_next/') ||
-    url.pathname.match(
-      /\.(js|css|png|jpg|jpeg|svg|gif|webp|woff2?|ttf|ico)$/
-    )
+    req.destination === 'script' ||
+    req.destination === 'style' ||
+    req.destination === 'image' ||
+    req.destination === 'font'
   ) {
     event.respondWith(
-      caches.match(request).then(function (cached) {
+      caches.match(req).then((cached) => {
         if (cached) return cached
-
-        return fetch(request).then(function (response) {
-          if (!response || !response.ok) return response
-
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then(function (cache) {
-            cache.put(request, clone)
+        return fetch(req)
+          .then((res) => {
+            if (res && res.ok) {
+              const clone = res.clone()
+              caches.open(CACHE_NAME).then((c) => c.put(req, clone))
+            }
+            return res
           })
-          return response
-        })
+          .catch(() => cached) // don't throw
       })
     )
     return
   }
+
+  // 6) Everything else (manifest, favicon, etc.) ------
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      if (cached) return cached
+      return fetch(req)
+        .then((res) => {
+          if (res && res.ok) {
+            const clone = res.clone()
+            caches.open(CACHE_NAME).then((c) => c.put(req, clone))
+          }
+          return res
+        })
+        .catch(
+          () =>
+            cached ||
+            new Response('', { status: 200 }) // never crash offline
+        )
+    })
+  )
 })
+
+// ---------- helpers ----------
+async function staleWhileRevalidate(request, cacheName, broadcast = false) {
+  const cache = await caches.open(cacheName)
+  const cached = await cache.match(request)
+
+  const network = fetch(request)
+    .then(async (res) => {
+      if (res && res.ok) {
+        await cache.put(request, res.clone())
+        if (broadcast) {
+          const clients = await self.clients.matchAll()
+          clients.forEach((c) =>
+            c.postMessage({ type: 'CACHE_UPDATED', url: request.url })
+          )
+        }
+      }
+      return res
+    })
+    .catch(() => cached)
+
+  return cached || network
+}
