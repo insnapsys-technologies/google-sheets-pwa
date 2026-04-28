@@ -83,9 +83,9 @@ body {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse at 20% 50%, rgba(255, 45, 123, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 20% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
     radial-gradient(ellipse at 80% 10%, rgba(255, 255, 255, 0.02) 0%, transparent 40%),
-    radial-gradient(ellipse at 60% 90%, rgba(255, 45, 123, 0.03) 0%, transparent 40%);
+    radial-gradient(ellipse at 60% 90%, rgba(255, 255, 255, 0.015) 0%, transparent 40%);
   pointer-events: none;
   z-index: 0;
 }
@@ -107,6 +107,44 @@ body {
 [data-theme="glass"] .t-title {
   text-transform: none;
   letter-spacing: -0.03em;
+}
+
+/* ─── Gateway landing page ─── */
+.gateway-tile {
+  transition: transform 280ms ease;
+}
+.gateway-tile:hover {
+  transform: scale(1.015);
+  z-index: 1;
+}
+.gateway-tile:hover .tile-overlay {
+  background: rgba(0, 0, 0, 0.35) !important;
+}
+.gateway-tile:hover .tile-arrow {
+  color: rgba(255, 255, 255, 0.9) !important;
+  transform: translateX(3px);
+}
+
+/* Responsive: tablet — 2-col natural flow */
+@media (max-width: 900px) {
+  .gateway-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .gateway-grid > a {
+    grid-column: auto !important;
+    grid-row: auto !important;
+    min-height: 240px !important;
+  }
+}
+
+/* Responsive: mobile — single column */
+@media (max-width: 480px) {
+  .gateway-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .gateway-grid > a {
+    min-height: 200px !important;
+  }
 }
 
 /* Hide scrollbar on tab bar */
