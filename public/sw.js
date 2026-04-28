@@ -1,4 +1,5 @@
-const CACHE_NAME = 'directory-v1'
+const CACHE_NAME = 'directory-v2'
+const API_CACHE_NAME = 'api-data-v1'
 const SHELL_ASSETS = ['/', '/blog']
 
 // Install: pre-cache the app shell
@@ -11,14 +12,14 @@ self.addEventListener('install', function (event) {
   self.skipWaiting()
 })
 
-// Activate: clean up old caches
+// Activate: clean up old caches (including previous directory-v1)
 self.addEventListener('activate', function (event) {
   event.waitUntil(
     caches.keys().then(function (keys) {
       return Promise.all(
         keys
           .filter(function (key) {
-            return key !== CACHE_NAME
+            return key !== CACHE_NAME && key !== API_CACHE_NAME
           })
           .map(function (key) {
             return caches.delete(key)
@@ -55,8 +56,54 @@ self.addEventListener('notificationclick', function (event) {
 self.addEventListener('fetch', function (event) {
   const url = new URL(event.request.url)
 
-  // Do NOT cache API calls — always fetch fresh
-  if (url.pathname.startsWith('/api/')) return
+  // Stale-While-Revalidate for API calls:
+  // 1. Respond with cached data immediately (if available)
+  // 2. Always fetch network in parallel → update cache → notify clients
+  if (url.pathname.startsWith('/api/')) {
+    const request = event.request
+
+    // Start network fetch immediately — runs in parallel with cache lookup
+    const networkFetch = fetch(request.clone())
+
+    // Background pipeline: cache the fresh response, then postMessage all clients
+    const bgUpdate = networkFetch
+      .then(function (response) {
+        if (!response.ok) return
+        return caches
+          .open(API_CACHE_NAME)
+          .then(function (cache) {
+            return cache.put(request, response.clone())
+          })
+          .then(function () {
+            return self.clients.matchAll()
+          })
+          .then(function (clients) {
+            clients.forEach(function (c) {
+              c.postMessage({ type: 'CACHE_UPDATED', url: request.url })
+            })
+          })
+      })
+      .catch(function () {})
+
+    // Keep SW alive until cache write + notifications complete
+    event.waitUntil(bgUpdate)
+
+    // Respond: cached (stale) immediately, or wait for network if no cache yet
+    event.respondWith(
+      caches
+        .open(API_CACHE_NAME)
+        .then(function (cache) {
+          return cache.match(request)
+        })
+        .then(function (cached) {
+          return cached || networkFetch
+        })
+        .catch(function () {
+          return caches.match(request)
+        })
+    )
+    return
+  }
 
   // Network-first for page navigations, cache as fallback
   if (event.request.mode === 'navigate') {

@@ -171,16 +171,48 @@ function PostCard({ post }: { post: BlogPost }) {
   )
 }
 
+const BLOG_CACHE_PREFIX = 'blog_cache_'
+const CACHE_TTL_MS = (Number(process.env.NEXT_PUBLIC_CACHE_TTL_SECONDS) || 60) * 1000
+
 export default function BlogUpdatesView({ tab }: Props) {
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
+
+    // Show cached posts immediately if still within TTL
+    let cacheValid = false
+    try {
+      const raw = localStorage.getItem(BLOG_CACHE_PREFIX + tab)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Date.now() - (parsed.cachedAt ?? 0) <= CACHE_TTL_MS) {
+          setPosts(parsePostsFromRaw(parsed.data))
+          cacheValid = true
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // Skip network fetch if cache is still fresh
+    if (cacheValid) {
+      setLoading(false)
+      return
+    }
+
     fetch(`/api/sheets/${encodeURIComponent(tab)}`)
       .then((r) => r.json())
-      .then(({ data }) => { setPosts(parsePostsFromRaw(data)) })
-      .catch(() => setPosts([]))
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          try { localStorage.setItem(BLOG_CACHE_PREFIX + tab, JSON.stringify({ data, cachedAt: Date.now() })) } catch { /* quota exceeded */ }
+        }
+        setPosts(parsePostsFromRaw(data))
+      })
+      .catch(() => {
+        // Network failed — cached data already shown above
+      })
       .finally(() => setLoading(false))
   }, [tab])
 
