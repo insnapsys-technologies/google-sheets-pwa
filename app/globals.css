@@ -125,25 +125,10 @@ body {
   transform: translateX(3px);
 }
 
-/* Responsive: tablet — 2-col natural flow */
-@media (max-width: 900px) {
-  .gateway-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-  .gateway-grid > a {
-    grid-column: auto !important;
-    grid-row: auto !important;
-    min-height: 240px !important;
-  }
-}
-
-/* Responsive: mobile — single column */
+/* Responsive: mobile — keep 2-col, tighten card height */
 @media (max-width: 480px) {
-  .gateway-grid {
-    grid-template-columns: 1fr !important;
-  }
   .gateway-grid > a {
-    min-height: 200px !important;
+    min-height: 160px !important;
   }
 }
 
