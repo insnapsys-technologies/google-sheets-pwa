@@ -5,7 +5,6 @@ import { getIDBEntry, setIDBEntry } from '@/lib/idb'
 import type { Row, Table, RecordItem } from './types'
 
 const CACHE_TTL_MS = (Number(process.env.NEXT_PUBLIC_CACHE_TTL_SECONDS) || 60) * 1000
-const API_CACHE_NAME = 'api-data-v1'
 
 export function useSheetData(tab: string, isContentView: boolean) {
   const [tables, setTables] = useState<Table[]>([])
@@ -153,8 +152,9 @@ export function useSheetData(tab: string, isContentView: boolean) {
 
       ;(async () => {
         try {
-          const cache = await caches.open(API_CACHE_NAME)
+          const cache = await caches.open(process.env.API_CACHE_NAME as string)
           const response = await cache.match(event.data.url as string)
+          // console.log(`[SW] CACHE_UPDATED for ${tab}:`, { msgPathname, eventData: event.data, response }, cache)
           if (!response) return
           const { data, hyperlinks: rawHyperlinks } = await response.json()
           if (!data || data.length === 0) return

@@ -1,5 +1,6 @@
 const CACHE_NAME = 'directory-v4'
-const API_CACHE = 'api-data-v2'
+const API_CACHE = 'api-data-v1'
+//Env variables access not supported in service worker file, so hardcoding cache name and API cache here. Update these manually when needed.
 
 // ---------- INSTALL (no addAll; never fail) ----------
 self.addEventListener('install', (event) => {
