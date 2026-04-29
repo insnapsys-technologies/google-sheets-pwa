@@ -42,8 +42,11 @@ function extractCellFormatting(cell: XLSX.CellObject | undefined): CellFormattin
   return Object.keys(result).length > 0 ? result : null
 }
 
-/** Tabs that must never be exposed in listings or data APIs */
-export const HIDDEN_TABS = ['Newsletter Subscribers'];
+/** Normalise a tab name for loose matching: lowercase, no spaces */
+const normaliseTab = (s: string) => s.toLowerCase().replace(/\s+/g, '')
+
+/** Tab name patterns to hide from public listings (normalised, substring match) */
+export const HIDDEN_TAB_PATTERNS = ['newsletter'];
 
 export interface BlogPost {
   title: string;
@@ -77,7 +80,9 @@ const getWorkbook = async (): Promise<XLSX.WorkBook> => {
 
 export const getSheetTabs = async (): Promise<string[]> => {
   const wb = await getWorkbook();
-  return wb.SheetNames.filter((name) => !HIDDEN_TABS.includes(name));
+  return wb.SheetNames.filter(
+    (name) => !HIDDEN_TAB_PATTERNS.some((pattern) => normaliseTab(name).includes(pattern))
+  );
 };
 
 export const fetchSheet = async (sheetName: string): Promise<(string | null)[][]> => {
