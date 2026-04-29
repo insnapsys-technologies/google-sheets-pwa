@@ -15,7 +15,7 @@ export default function DirectoryClient({ tab }: DirectoryClientProps) {
   const [locationFilter, setLocationFilter] = useState('')
 
   // Single-column content view: only plain text + hyperlinks, no card grid
-  const isContentView = tab.toLowerCase().startsWith('independent pigment mixer')
+  const isContentView = tab.toLowerCase().includes('pigment')
 
   const { records, tables, loading } = useSheetData(tab, isContentView)
 
