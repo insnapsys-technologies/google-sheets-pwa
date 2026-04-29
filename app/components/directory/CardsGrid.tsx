@@ -61,6 +61,13 @@ export default function CardsGrid({ records }: Props) {
 
         if (!name || String(name).trim() === '') return null
 
+        // Pick the most relevant cell formatting: name cell first, then any non-null in the row
+        const rowFmt = rec.formatting ?? []
+        const nameFmt = nameIdxLocal >= 0 ? (rowFmt[nameIdxLocal] ?? null) : null
+        const fmt = nameFmt ?? rowFmt.find((f) => f != null) ?? null
+        const accentColor = fmt?.bgColor ? `#${fmt.bgColor}` : null
+        const titleColor = fmt?.textColor ? `#${fmt.textColor}` : 'var(--foreground)'
+
         const otherFields = rowHeaders
           .map((h, idx) => ({ label: h, value: row[idx] }))
           .filter((_, idx) => idx !== nameIdxLocal && idx !== logoIdxLocal && idx !== urlIdxLocal)
@@ -77,12 +84,13 @@ export default function CardsGrid({ records }: Props) {
                 backdropFilter: 'var(--card-blur)',
                 WebkitBackdropFilter: 'var(--card-blur)',
                 boxShadow: 'var(--card-shadow)',
+                ...(accentColor && { borderLeft: `4px solid ${accentColor}` }),
               }}
             >
               <div>
                 <h3
                   className="font-bold text-sm leading-snug line-clamp-2 t-title"
-                  style={{ color: 'var(--foreground)' }}
+                  style={{ color: titleColor }}
                 >
                   {name}
                 </h3>

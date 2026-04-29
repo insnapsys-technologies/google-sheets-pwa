@@ -12,7 +12,7 @@ export function useSheetData(tab: string, isContentView: boolean) {
   const [loading, setLoading] = useState(false)
   const cachedAtRef = useRef<number>(0)
 
-  const applyData = (data: any[][], rawHyperlinks: (string | null)[][]) => {
+  const applyData = (data: any[][], rawHyperlinks: (string | null)[][], rawFormatting: (any | null)[][]) => {
     if (!data || data.length === 0) return
 
     // Content view: every row is a content row — section headings must NOT be
@@ -23,6 +23,7 @@ export function useSheetData(tab: string, isContentView: boolean) {
           headers: [],
           row: (row as any[]).map((cell: any) => String(cell ?? '')),
           hyperlinks: (rawHyperlinks ?? [])[idx] ?? [],
+          formatting: (rawFormatting ?? [])[idx] ?? [],
         })
       )
       setRecords(contentRecords)
@@ -35,7 +36,8 @@ export function useSheetData(tab: string, isContentView: boolean) {
 
     const parseTables = (
       allRows: any[][],
-      allHyperlinks: (string | null)[][]
+      allHyperlinks: (string | null)[][],
+      allFormatting: (any | null)[][]
     ): Table[] => {
       const out: Table[] = []
       let i = 0
@@ -48,27 +50,31 @@ export function useSheetData(tab: string, isContentView: boolean) {
 
         const rows: Row[] = []
         const rowHyperlinks: (string | null)[][] = []
+        const rowFormatting: (any | null)[][] = []
         while (i < allRows.length && !rowIsEmpty(allRows[i])) {
           rows.push(allRows[i])
           rowHyperlinks.push(allHyperlinks[i] ?? [])
+          rowFormatting.push(allFormatting[i] ?? [])
           i++
         }
 
         const filteredRows: Row[] = []
         const filteredHyperlinks: (string | null)[][] = []
+        const filteredFormatting: (any | null)[][] = []
         rows.forEach((row, idx) => {
           if (!rowIsEmpty(row)) {
             filteredRows.push(row)
             filteredHyperlinks.push(rowHyperlinks[idx] ?? [])
+            filteredFormatting.push(rowFormatting[idx] ?? [])
           }
         })
 
-        out.push({ headers: headersRow, rows: filteredRows, rowHyperlinks: filteredHyperlinks })
+        out.push({ headers: headersRow, rows: filteredRows, rowHyperlinks: filteredHyperlinks, rowFormatting: filteredFormatting })
       }
       return out
     }
 
-    const parsed = parseTables(data, rawHyperlinks ?? [])
+    const parsed = parseTables(data, rawHyperlinks ?? [], rawFormatting ?? [])
     setTables(parsed)
 
     const allRecords: RecordItem[] = parsed.flatMap((t) =>
@@ -76,6 +82,7 @@ export function useSheetData(tab: string, isContentView: boolean) {
         headers: t.headers,
         row: r,
         hyperlinks: t.rowHyperlinks[idx] ?? [],
+        formatting: t.rowFormatting[idx] ?? [],
       }))
     )
     setRecords(allRecords)
@@ -97,7 +104,7 @@ export function useSheetData(tab: string, isContentView: boolean) {
 
       if (cached) {
         hadCache = true
-        applyData(cached.data, cached.hyperlinks)
+        applyData(cached.data, cached.hyperlinks, cached.formatting ?? [])
         cachedAtRef.current = cached.cachedAt
       } else {
         setLoading(true)
@@ -108,16 +115,16 @@ export function useSheetData(tab: string, isContentView: boolean) {
       try {
         const r = await fetch(`/api/sheets/${encodeURIComponent(tab)}`)
         if (cancelled) return
-        const { data, hyperlinks: rawHyperlinks } = await r.json()
+        const { data, hyperlinks: rawHyperlinks, formatting: rawFormatting } = await r.json()
         if (data && data.length > 0) {
-          await setIDBEntry(tab, data, rawHyperlinks ?? [])
+          await setIDBEntry(tab, data, rawHyperlinks ?? [], rawFormatting ?? [])
           if (!cancelled) {
             const now = Date.now()
             // Only re-render if no prior cache existed, or the TTL has expired.
             // CACHE_UPDATED from SW handles the truly-fresh re-render case.
             const shouldUpdate = !hadCache || now - cachedAtRef.current > CACHE_TTL_MS
             cachedAtRef.current = now
-            if (shouldUpdate) applyData(data, rawHyperlinks ?? [])
+            if (shouldUpdate) applyData(data, rawHyperlinks ?? [], rawFormatting ?? [])
           }
         }
       } catch {
@@ -156,11 +163,11 @@ export function useSheetData(tab: string, isContentView: boolean) {
           const response = await cache.match(event.data.url as string)
           // console.log(`[SW] CACHE_UPDATED for ${tab}:`, { msgPathname, eventData: event.data, response }, cache)
           if (!response) return
-          const { data, hyperlinks: rawHyperlinks } = await response.json()
+          const { data, hyperlinks: rawHyperlinks, formatting: rawFormatting } = await response.json()
           if (!data || data.length === 0) return
-          await setIDBEntry(tab, data, rawHyperlinks ?? [])
+          await setIDBEntry(tab, data, rawHyperlinks ?? [], rawFormatting ?? [])
           cachedAtRef.current = Date.now()
-          applyData(data, rawHyperlinks ?? [])
+          applyData(data, rawHyperlinks ?? [], rawFormatting ?? [])
         } catch {
           // Cache Storage unavailable or malformed — silently ignore
         }

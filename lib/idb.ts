@@ -6,6 +6,7 @@ export interface IDBEntry {
   tab: string
   data: (string | null)[][]
   hyperlinks: (string | null)[][]
+  formatting: (Record<string, unknown> | null)[][]
   cachedAt: number
 }
 
@@ -40,13 +41,14 @@ export async function getIDBEntry(tab: string): Promise<IDBEntry | null> {
 export async function setIDBEntry(
   tab: string,
   data: (string | null)[][],
-  hyperlinks: (string | null)[][]
+  hyperlinks: (string | null)[][],
+  formatting: (Record<string, unknown> | null)[][] = []
 ): Promise<void> {
   try {
     const db = await openDB()
     await new Promise<void>((resolve) => {
       const tx = db.transaction(STORE_NAME, 'readwrite')
-      tx.objectStore(STORE_NAME).put({ tab, data, hyperlinks, cachedAt: Date.now() })
+      tx.objectStore(STORE_NAME).put({ tab, data, hyperlinks, formatting, cachedAt: Date.now() })
       tx.oncomplete = () => resolve()
       tx.onerror = () => resolve()
     })

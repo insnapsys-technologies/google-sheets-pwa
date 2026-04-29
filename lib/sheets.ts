@@ -1,6 +1,47 @@
 import { google } from "googleapis";
 import * as XLSX from "xlsx";
 
+export type CellFormatting = {
+  /** 6-char RGB hex, e.g. "FF6600" */
+  bgColor?: string
+  /** 6-char RGB hex */
+  textColor?: string
+  bold?: boolean
+}
+
+function extractCellFormatting(cell: XLSX.CellObject | undefined): CellFormatting | null {
+  if (!cell) return null
+  const s = (cell as any).s
+  if (!s || typeof s !== 'object') return null
+
+  const result: CellFormatting = {}
+
+  // Background fill color (solid fill stores it in fgColor in xlsx spec)
+  const fgRaw: unknown = s?.fill?.fgColor?.rgb ?? s?.fgColor?.rgb
+  if (typeof fgRaw === 'string' && fgRaw.length >= 6) {
+    // ARGB (8-char) or RGB (6-char) — strip alpha channel prefix
+    const rgb = fgRaw.length === 8 ? fgRaw.slice(2) : fgRaw.slice(-6)
+    if (!/^(FFFFFF|ffffff|000000)$/.test(rgb)) {
+      result.bgColor = rgb.toUpperCase()
+    }
+  }
+
+  // Font/text color
+  const fontColorRaw: unknown = s?.font?.color?.rgb ?? s?.color?.rgb
+  if (typeof fontColorRaw === 'string' && fontColorRaw.length >= 6) {
+    const rgb = fontColorRaw.length === 8 ? fontColorRaw.slice(2) : fontColorRaw.slice(-6)
+    if (!/^(000000|FFFFFF|ffffff)$/.test(rgb)) {
+      result.textColor = rgb.toUpperCase()
+    }
+  }
+
+  // Bold
+  const bold: unknown = s?.font?.bold ?? s?.bold
+  if (bold === true) result.bold = true
+
+  return Object.keys(result).length > 0 ? result : null
+}
+
 /** Tabs that must never be exposed in listings or data APIs */
 export const HIDDEN_TABS = ['Newsletter Subscribers'];
 
@@ -25,12 +66,13 @@ const getDriveClient = () => {
 
 const getWorkbook = async (): Promise<XLSX.WorkBook> => {
   const drive = getDriveClient();
+  // console.log('Fetching workbook from Google Drive file ID:', process.env.GOOGLE_SHEET_FILE_ID);
   const res = await drive.files.get(
     { fileId: process.env.GOOGLE_SHEET_FILE_ID!, alt: "media" },
     { responseType: "arraybuffer" }
   );
   const buffer = Buffer.from(res.data as ArrayBuffer);
-  return XLSX.read(buffer, { type: "buffer" });
+  return XLSX.read(buffer, { type: "buffer", cellStyles: true });
 };
 
 export const getSheetTabs = async (): Promise<string[]> => {
@@ -51,10 +93,10 @@ export const fetchSheet = async (sheetName: string): Promise<(string | null)[][]
 
 export const fetchSheetWithLinks = async (
   sheetName: string
-): Promise<{ values: (string | null)[][]; hyperlinks: (string | null)[][] }> => {
+): Promise<{ values: (string | null)[][]; hyperlinks: (string | null)[][]; formatting: (CellFormatting | null)[][] }> => {
   const wb = await getWorkbook();
   const ws = wb.Sheets[sheetName];
-  if (!ws) return { values: [], hyperlinks: [] };
+  if (!ws) return { values: [], hyperlinks: [], formatting: [] };
 
   const rows: (string | null)[][] = XLSX.utils.sheet_to_json<(string | null)[]>(ws, {
     header: 1,
@@ -74,7 +116,15 @@ export const fetchSheetWithLinks = async (
     })
   );
 
-  return { values: rows, hyperlinks };
+  const formatting: (CellFormatting | null)[][] = rows.map((row, R) =>
+    row.map((_, C) => {
+      if (!range) return null;
+      const cellAddress = XLSX.utils.encode_cell({ r: R + range.s.r, c: C + range.s.c });
+      return extractCellFormatting(ws[cellAddress]);
+    })
+  );
+
+  return { values: rows, hyperlinks, formatting };
 };
 
 const BLOG_TAB = process.env.BLOG_TAB_NAME || "Blog";
