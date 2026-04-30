@@ -29,8 +29,8 @@ export async function subscribeToNewsletter(formData: FormData): Promise<{ succe
 
   try {
     const sheets = getSheetsClient()
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID!
-    const tab = 'Newsletter Subscribers'
+    const spreadsheetId = process.env.GOOGLE_NEWSLETTER_FILE_ID!
+    const tab = 'Blad1' // Change this to your actual sheet/tab name
 
     // 1. Fetch all existing data (headers + rows)
     const existing = await sheets.spreadsheets.values.get({
@@ -48,8 +48,8 @@ export async function subscribeToNewsletter(formData: FormData): Promise<{ succe
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [
-            ['Timestamp', 'Name', 'Email'],
-            [new Date().toISOString(), name, email],
+            ['Date', 'Email Address', 'Name'],
+            [new Date().toISOString(), email, name],
           ],
         },
       })

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { fetchSheetWithLinks, HIDDEN_TABS } from "@/lib/sheets";
+import { fetchSheetWithLinks, HIDDEN_TAB_PATTERNS } from "@/lib/sheets";
 
 export const revalidate = 30;
+
+const normaliseTab = (s: string) => s.toLowerCase().replace(/\s+/g, '')
 
 export async function GET(
   request: Request,
@@ -9,13 +11,13 @@ export async function GET(
 ) {
   const { tab } = await params;
 
-  if (HIDDEN_TABS.includes(tab)) {
+  if (HIDDEN_TAB_PATTERNS.some((pattern) => normaliseTab(tab).includes(pattern))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   try {
-    const { values, hyperlinks } = await fetchSheetWithLinks(tab);
-    return NextResponse.json({ data: values, hyperlinks });
+    const { values, hyperlinks, formatting } = await fetchSheetWithLinks(tab);
+    return NextResponse.json({ data: values, hyperlinks, formatting });
   } catch (error) {
     console.error("Error fetching sheet:", error);
     return NextResponse.json(

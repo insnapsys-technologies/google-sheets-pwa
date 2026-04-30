@@ -6,7 +6,10 @@ import { notFound } from 'next/navigation'
 export const revalidate = 30
 
 function toSlug(tab: string) {
-  return tab.toLowerCase().replace(/\s+/g, '-')
+ return tab
+    .toLowerCase()
+    .replace(/\//g, '')        // remove all slashes
+    .replace(/\s+/g, '-')     // convert spaces to hyphens
 }
 
 export async function generateStaticParams() {

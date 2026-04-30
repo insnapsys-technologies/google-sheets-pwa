@@ -15,7 +15,7 @@ export default function DirectoryClient({ tab }: DirectoryClientProps) {
   const [locationFilter, setLocationFilter] = useState('')
 
   // Single-column content view: only plain text + hyperlinks, no card grid
-  const isContentView = tab.toLowerCase().startsWith('independent pigment mixer')
+  const isContentView = tab.toLowerCase().includes('pigment')
 
   const { records, tables, loading } = useSheetData(tab, isContentView)
 
@@ -132,10 +132,10 @@ export default function DirectoryClient({ tab }: DirectoryClientProps) {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Search bar and table filter - side by side */}
-        <div className="mb-6 flex gap-3 flex-wrap items-end">
-          {/* Search bar */}
-          <div className="relative flex-1 min-w-xs max-w-md">
+        {/* Search bar and table filter */}
+        <div className="mb-6 flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
+          {/* Search bar - full width on mobile */}
+          <div className="relative w-full sm:flex-1 sm:max-w-md">
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
               style={{ color: 'var(--muted)' }}
@@ -168,14 +168,17 @@ export default function DirectoryClient({ tab }: DirectoryClientProps) {
             />
           </div>
 
-          {/* Location filter dropdown — shown only when an address-like column exists */}
-          {!isContentView && locationGroups.length > 0 && (
-          <div className="relative">
+          {/* Location + Table filter dropdowns — side-by-side row on both mobile and desktop */}
+          {!isContentView && (
+          <div className="flex gap-3">
+            {/* Location filter — shown only when an address-like column exists */}
+            {locationGroups.length > 0 && (
+          <div className="relative flex-1 min-w-0">
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
               disabled={loading}
-              className="px-3 py-2.5 pr-8 text-sm font-bold focus:outline-none appearance-none"
+              className="w-full px-3 py-2.5 pr-8 text-sm font-bold focus:outline-none appearance-none"
               style={{
                 background: 'var(--background)',
                 color: 'var(--foreground)',
@@ -211,7 +214,6 @@ export default function DirectoryClient({ tab }: DirectoryClientProps) {
                 )
               )}
             </select>
-            {/* Custom dropdown arrow */}
             <svg
               className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
               style={{ color: 'var(--foreground)' }}
@@ -225,16 +227,15 @@ export default function DirectoryClient({ tab }: DirectoryClientProps) {
           </div>
           )}
 
-          {/* Table filter dropdown — hidden for single-column content tabs */}
-          {!isContentView && (
-          <div className="relative">
+          {/* Table filter dropdown */}
+          <div className="relative flex-1 min-w-0">
             <select
               value={tables.length === 0 ? 'all' : activeTableIdx === null ? 'all' : String(activeTableIdx)}
               onChange={(e) =>
                 setActiveTableIdx(e.target.value === 'all' ? null : parseInt(e.target.value))
               }
               disabled={loading || tables.length === 0}
-              className="px-3 py-2.5 pr-8 text-sm font-bold focus:outline-none appearance-none"
+              className="w-full px-3 py-2.5 pr-8 text-sm font-bold focus:outline-none appearance-none"
               style={{
                 background: 'var(--background)',
                 color: 'var(--foreground)',
@@ -255,7 +256,6 @@ export default function DirectoryClient({ tab }: DirectoryClientProps) {
                 </option>
               ))}
             </select>
-            {/* Custom dropdown arrow */}
             <svg
               className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
               style={{ color: 'var(--foreground)' }}
@@ -269,9 +269,10 @@ export default function DirectoryClient({ tab }: DirectoryClientProps) {
                 strokeLinejoin="round"
                 d="M19 14l-7 7m0 0l-7-7m7 7V3"
               />
-            </svg>
+              </svg>
+            </div>
           </div>
-          )} {/* end !isContentView table filter */}
+          )} {/* end !isContentView filters */}
         </div>
 
         {/* Loading skeleton */}

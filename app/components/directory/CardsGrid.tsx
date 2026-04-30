@@ -16,19 +16,57 @@ export default function CardsGrid({ records }: Props) {
         const rowHyperlinks = rec.hyperlinks ?? []
 
         const nameIdxLocal = rowHeaders.findIndex((h) => /^name$/i.test(String(h).trim()))
-        const logoIdxLocal = rowHeaders.findIndex((h) => /logo|image|icon/i.test(String(h)))
         const urlIdxLocal = rowHeaders.findIndex((h) =>
           /url|link|website|^web$/i.test(String(h).trim())
         )
 
+        const isImageUrl = (val: unknown): boolean => {
+          if (!val || typeof val !== 'string') return false
+          const v = val.trim()
+          if (!v.startsWith('http')) return false
+          // Strip query string and fragment, then check extension at end of path
+          const pathPart = v.replace(/[?#].*$/, '')
+          if (/\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i.test(pathPart)) return true
+          // Wix-style CDN: extension appears mid-path before /v1/fill/... segments
+          if (/\.(png|jpe?g|gif|webp|svg|bmp|ico)[/?]/i.test(v)) return true
+          // Known image CDN domains or path patterns (Shopify, Wix, BigCartel, etc.)
+          return /imgur\.com|cloudinary\.com|googleusercontent\.com|twimg\.com|githubusercontent\.com|wixstatic\.com|bigcartel\.com|\/cdn\/shop\/files\//i.test(v)
+        }
+
+        // Check both cell value and hyperlink URL for image URL detection
+        const isImageAtIdx = (idx: number): boolean =>
+          isImageUrl(row[idx]) || isImageUrl(rowHyperlinks[idx])
+
+        let logoIdxLocal = rowHeaders.findIndex((h) => /logo|image|icon/i.test(String(h)))
+        if (logoIdxLocal === -1) {
+          // Scan all columns (including headerless ones beyond rowHeaders length)
+          const maxLen = Math.max(row.length, rowHeaders.length)
+          for (let idx = 0; idx < maxLen; idx++) {
+            if (idx !== nameIdxLocal && idx !== urlIdxLocal && isImageAtIdx(idx)) {
+              logoIdxLocal = idx
+              break
+            }
+          }
+        }
+
         const name = nameIdxLocal >= 0 ? row[nameIdxLocal] : row[0]
-        const logo = logoIdxLocal >= 0 ? row[logoIdxLocal] : null
+        // Prefer the hyperlink URL if it's an image, otherwise use cell value
+        const logoRaw = logoIdxLocal >= 0 ? row[logoIdxLocal] : null
+        const logoHyperlinkRaw = logoIdxLocal >= 0 ? (rowHyperlinks[logoIdxLocal] ?? null) : null
+        const logo = isImageUrl(logoHyperlinkRaw) ? logoHyperlinkRaw : (isImageUrl(logoRaw) ? logoRaw : logoHyperlinkRaw ?? logoRaw)
 
         const rawUrlValue = urlIdxLocal >= 0 ? String(row[urlIdxLocal] ?? '') : ''
         const urlHyperlink = urlIdxLocal >= 0 ? (rowHyperlinks[urlIdxLocal] ?? null) : null
         const url = urlHyperlink ?? (rawUrlValue.startsWith('http') ? rawUrlValue : null)
 
         if (!name || String(name).trim() === '') return null
+
+        // Pick the most relevant cell formatting: name cell first, then any non-null in the row
+        const rowFmt = rec.formatting ?? []
+        const nameFmt = nameIdxLocal >= 0 ? (rowFmt[nameIdxLocal] ?? null) : null
+        const fmt = nameFmt ?? rowFmt.find((f) => f != null) ?? null
+        const accentColor = fmt?.bgColor ? `#${fmt.bgColor}` : null
+        const titleColor = fmt?.textColor ? `#${fmt.textColor}` : 'var(--foreground)'
 
         const otherFields = rowHeaders
           .map((h, idx) => ({ label: h, value: row[idx] }))
@@ -46,46 +84,13 @@ export default function CardsGrid({ records }: Props) {
                 backdropFilter: 'var(--card-blur)',
                 WebkitBackdropFilter: 'var(--card-blur)',
                 boxShadow: 'var(--card-shadow)',
+                ...(accentColor && { borderLeft: `4px solid ${accentColor}` }),
               }}
             >
-              <div className="flex items-center gap-3">
-                {logo ? (
-                  <img
-                    src={logo}
-                    alt={name ?? ''}
-                    width={40}
-                    height={40}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-10 h-10 object-contain flex-shrink-0"
-                    style={{
-                      background: 'var(--background)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'calc(var(--card-radius) / 2)',
-                    }}
-                    onError={(e) => {
-                      const img = e.target as HTMLImageElement
-                      img.style.display = 'none'
-                      const fallback = img.nextElementSibling as HTMLElement
-                      if (fallback) fallback.style.display = 'flex'
-                    }}
-                  />
-                ) : null}
-                <div
-                  className="w-10 h-10 flex-shrink-0 items-center justify-center font-black text-sm"
-                  style={{
-                    display: logo ? 'none' : 'flex',
-                    background: 'var(--background)',
-                    color: 'var(--foreground)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'calc(var(--card-radius) / 2)',
-                  }}
-                >
-                  {name?.[0]?.toUpperCase() ?? '?'}
-                </div>
+              <div>
                 <h3
                   className="font-bold text-sm leading-snug line-clamp-2 t-title"
-                  style={{ color: 'var(--foreground)' }}
+                  style={{ color: titleColor }}
                 >
                   {name}
                 </h3>
@@ -151,6 +156,29 @@ export default function CardsGrid({ records }: Props) {
                   )
                 })}
               </div>
+
+              {logo && (
+                <div
+                  className="w-full overflow-hidden"
+                  style={{
+                    borderRadius: 'calc(var(--card-radius) / 2)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <img
+                    src={logo}
+                    alt={name ?? ''}
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full object-contain max-h-20"
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement
+                      const wrapper = img.parentElement
+                      if (wrapper) wrapper.style.display = 'none'
+                    }}
+                  />
+                </div>
+              )}
 
               {url && (
                 <button
