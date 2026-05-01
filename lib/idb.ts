@@ -1,4 +1,4 @@
-const DB_NAME = 'pwa-sheets-cache'
+const DB_NAME = 'pwa-sheets-cache-v2'
 const STORE_NAME = 'sheets'
 const DB_VERSION = 1
 

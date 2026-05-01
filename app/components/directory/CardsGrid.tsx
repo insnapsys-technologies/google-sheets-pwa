@@ -15,7 +15,8 @@ export default function CardsGrid({ records }: Props) {
         const rowHeaders = rec.headers
         const rowHyperlinks = rec.hyperlinks ?? []
 
-        const nameIdxLocal = rowHeaders.findIndex((h) => /^name$/i.test(String(h).trim()))
+        // First column is always the name/title
+        const nameIdxLocal = 0
         const urlIdxLocal = rowHeaders.findIndex((h) =>
           /url|link|website|^web$/i.test(String(h).trim())
         )
@@ -23,6 +24,8 @@ export default function CardsGrid({ records }: Props) {
         const isImageUrl = (val: unknown): boolean => {
           if (!val || typeof val !== 'string') return false
           const v = val.trim()
+          // Our own Drive proxy URL (relative path)
+          if (/^\/api\/image\?id=[A-Za-z0-9_-]+/.test(v)) return true
           if (!v.startsWith('http')) return false
           // Strip query string and fragment, then check extension at end of path
           const pathPart = v.replace(/[?#].*$/, '')
