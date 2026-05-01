@@ -66,13 +66,13 @@ export default function NewsletterForm() {
             outline: 'none',
           }}
         />
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="email"
             name="email"
             required
             placeholder="your@email.com"
-            className="flex-1 px-4 py-2.5 text-sm"
+            className="w-full sm:flex-1 px-4 py-2.5 text-sm"
             style={{
               background: 'var(--background)',
               color: 'var(--foreground)',
@@ -85,7 +85,7 @@ export default function NewsletterForm() {
           <button
             type="submit"
             disabled={status === 'loading'}
-            className="px-5 py-2.5 text-xs font-bold t-upper cursor-pointer"
+            className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold t-upper cursor-pointer"
             style={{
               background: 'var(--accent)',
               color: '#fff',
@@ -93,7 +93,6 @@ export default function NewsletterForm() {
               borderRadius: 'var(--card-radius)',
               opacity: status === 'loading' ? 0.6 : 1,
               transition: 'opacity var(--transition-speed) ease',
-              whiteSpace: 'nowrap',
             }}
           >
             {status === 'loading' ? 'Subscribing…' : 'Subscribe'}

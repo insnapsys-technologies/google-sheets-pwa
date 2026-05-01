@@ -64,6 +64,11 @@ export default function CardsGrid({ records }: Props) {
 
         if (!name || String(name).trim() === '') return null
 
+        // Skip repeated header rows (rows whose values contain header keywords)
+        const HEADER_KEYWORDS = /^(address|social|web|website|phone|email|name|logo|url|link)$/i
+        const isHeaderRow = row.some((v) => v && HEADER_KEYWORDS.test(String(v).trim()))
+        if (isHeaderRow) return null
+
         // Pick the most relevant cell formatting: name cell first, then any non-null in the row
         const rowFmt = rec.formatting ?? []
         const nameFmt = nameIdxLocal >= 0 ? (rowFmt[nameIdxLocal] ?? null) : null
