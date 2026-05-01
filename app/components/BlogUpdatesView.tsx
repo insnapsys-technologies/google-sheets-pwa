@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import NewsletterForm from './NewsletterForm'
 
 interface BlogPost {
@@ -218,18 +219,47 @@ export default function BlogUpdatesView({ tab }: Props) {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--background)' }}>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
-
-        <div className="mb-8">
-          <h1 className="text-3xl font-black t-title mb-1" style={{ color: 'var(--foreground)' }}>
-            {tab}
-          </h1>
-          {!loading && (
-            <p className="text-sm" style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+      {/* Breadcrumb nav */}
+      <div
+        className="sticky top-14 z-10"
+        style={{
+          background: 'var(--nav-bg)',
+          backdropFilter: 'var(--nav-blur)',
+          WebkitBackdropFilter: 'var(--nav-blur)',
+          borderBottom: 'var(--nav-border)',
+        }}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="flex items-center justify-between h-11">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="flex items-center gap-1 text-xs font-bold t-upper"
+              style={{ color: 'var(--muted)', transition: 'color var(--transition-speed) ease' }}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              All
+            </Link>
+            <span style={{ color: 'var(--border)' }}>{'/'}</span>
+            <span className="text-xs font-bold t-upper" style={{ color: 'var(--foreground)' }}>
+              {tab}
+            </span>
+          </div>
+          {!loading && posts.length > 0 && (
+            <span
+              className="text-xs tabular-nums"
+              style={{ color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}
+            >
               {posts.length} {posts.length === 1 ? 'post' : 'posts'}
-            </p>
+            </span>
           )}
+          </div>
         </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
 
         <NewsletterForm />
 
@@ -272,7 +302,7 @@ export default function BlogUpdatesView({ tab }: Props) {
           ))}
         </div>
 
-      </div>
+      </main>
     </div>
   )
 }
