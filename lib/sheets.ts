@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import * as XLSX from "xlsx";
+import { driveProxyUrl as _driveProxyUrl } from "./drive-utils";
 
 export type CellFormatting = {
   /** 6-char RGB hex, e.g. "FF6600" */
@@ -44,6 +45,14 @@ function extractCellFormatting(cell: XLSX.CellObject | undefined): CellFormattin
 
 /** Normalise a tab name for loose matching: lowercase, no spaces */
 const normaliseTab = (s: string) => s.toLowerCase().replace(/\s+/g, '')
+
+/**
+ * Re-export with server-side logging so we can trace conversions in Next.js logs.
+ */
+export function driveProxyUrl(url: string | null | undefined): string | null {
+  const result = _driveProxyUrl(url)
+  return result
+}
 
 /** Tab name patterns to hide from public listings (normalised, substring match) */
 export const HIDDEN_TAB_PATTERNS = ['newsletter'];
@@ -129,7 +138,15 @@ export const fetchSheetWithLinks = async (
     })
   );
 
-  return { values: rows, hyperlinks, formatting };
+  // Convert any Google Drive share links to proxy URLs so the browser can display them
+  const values: (string | null)[][] = rows.map((row) =>
+    row.map((cell) => driveProxyUrl(cell) ?? cell)
+  );
+  const convertedHyperlinks: (string | null)[][] = hyperlinks.map((row) =>
+    row.map((link) => driveProxyUrl(link) ?? link)
+  );
+
+  return { values, hyperlinks: convertedHyperlinks, formatting };
 };
 
 const BLOG_TAB = process.env.BLOG_TAB_NAME || "Blog";
@@ -157,7 +174,7 @@ export const fetchBlogPosts = async (tabName?: string): Promise<BlogPost[]> => {
       slug: slugIdx >= 0 && row[slugIdx] ? (row[slugIdx] as string) : makeSlug((row[titleIdx] as string) ?? ""),
       date: row[dateIdx] ?? "",
       content: row[contentIdx] ?? "",
-      image: row[imageIdx] ?? "",
+      image: (imageIdx >= 0 ? driveProxyUrl(row[imageIdx]) ?? row[imageIdx] : null) ?? "",
       tags: row[tagsIdx]
         ? (row[tagsIdx] as string).split(",").map((t) => t.trim()).filter(Boolean)
         : [],

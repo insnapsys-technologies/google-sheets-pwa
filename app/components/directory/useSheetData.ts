@@ -2,7 +2,27 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getIDBEntry, setIDBEntry } from '@/lib/idb'
+import { driveProxyUrl } from '@/lib/drive-utils'
 import type { Row, Table, RecordItem } from './types'
+
+/**
+ * Client-side safety net: converts any raw Google Drive URLs that slipped through
+ * (e.g. stale IDB cache written before server-side conversion was deployed).
+ */
+function sanitiseDriveUrls(
+  data: (string | null)[][],
+  hyperlinks: (string | null)[][]
+): { data: (string | null)[][]; hyperlinks: (string | null)[][] } {
+  const convertCell = (cell: string | null) => {
+    if (!cell) return cell
+    const proxy = driveProxyUrl(cell)
+    return proxy ?? cell
+  }
+  return {
+    data: data.map((row) => row.map(convertCell)),
+    hyperlinks: hyperlinks.map((row) => row.map(convertCell)),
+  }
+}
 
 const CACHE_TTL_MS = (Number(process.env.NEXT_PUBLIC_CACHE_TTL_SECONDS) || 60) * 1000
 
@@ -39,39 +59,29 @@ export function useSheetData(tab: string, isContentView: boolean) {
       allHyperlinks: (string | null)[][],
       allFormatting: (any | null)[][]
     ): Table[] => {
-      const out: Table[] = []
+      // The header is ALWAYS the first non-empty row of the sheet.
+      // All subsequent non-empty rows are data rows — empty rows between
+      // data rows are ignored and do NOT start a new header block.
       let i = 0
-      while (i < allRows.length) {
-        while (i < allRows.length && rowIsEmpty(allRows[i])) i++
-        if (i >= allRows.length) break
+      while (i < allRows.length && rowIsEmpty(allRows[i])) i++
+      if (i >= allRows.length) return []
 
-        const headersRow = allRows[i].map((h) => String(h ?? ''))
-        i++
+      const headersRow = allRows[i].map((h) => String(h ?? ''))
+      i++
 
-        const rows: Row[] = []
-        const rowHyperlinks: (string | null)[][] = []
-        const rowFormatting: (any | null)[][] = []
-        while (i < allRows.length && !rowIsEmpty(allRows[i])) {
-          rows.push(allRows[i])
-          rowHyperlinks.push(allHyperlinks[i] ?? [])
-          rowFormatting.push(allFormatting[i] ?? [])
-          i++
-        }
+      const filteredRows: Row[] = []
+      const filteredHyperlinks: (string | null)[][] = []
+      const filteredFormatting: (any | null)[][] = []
 
-        const filteredRows: Row[] = []
-        const filteredHyperlinks: (string | null)[][] = []
-        const filteredFormatting: (any | null)[][] = []
-        rows.forEach((row, idx) => {
-          if (!rowIsEmpty(row)) {
-            filteredRows.push(row)
-            filteredHyperlinks.push(rowHyperlinks[idx] ?? [])
-            filteredFormatting.push(rowFormatting[idx] ?? [])
-          }
-        })
-
-        out.push({ headers: headersRow, rows: filteredRows, rowHyperlinks: filteredHyperlinks, rowFormatting: filteredFormatting })
+      for (; i < allRows.length; i++) {
+        if (rowIsEmpty(allRows[i])) continue
+        filteredRows.push(allRows[i])
+        filteredHyperlinks.push(allHyperlinks[i] ?? [])
+        filteredFormatting.push(allFormatting[i] ?? [])
       }
-      return out
+
+      if (filteredRows.length === 0) return []
+      return [{ headers: headersRow, rows: filteredRows, rowHyperlinks: filteredHyperlinks, rowFormatting: filteredFormatting }]
     }
 
     const parsed = parseTables(data, rawHyperlinks ?? [], rawFormatting ?? [])
@@ -104,7 +114,8 @@ export function useSheetData(tab: string, isContentView: boolean) {
 
       if (cached) {
         hadCache = true
-        applyData(cached.data, cached.hyperlinks, cached.formatting ?? [])
+        const safe = sanitiseDriveUrls(cached.data, cached.hyperlinks ?? [])
+        applyData(safe.data, safe.hyperlinks, cached.formatting ?? [])
         cachedAtRef.current = cached.cachedAt
       } else {
         setLoading(true)
@@ -124,7 +135,10 @@ export function useSheetData(tab: string, isContentView: boolean) {
             // CACHE_UPDATED from SW handles the truly-fresh re-render case.
             const shouldUpdate = !hadCache || now - cachedAtRef.current > CACHE_TTL_MS
             cachedAtRef.current = now
-            if (shouldUpdate) applyData(data, rawHyperlinks ?? [], rawFormatting ?? [])
+            if (shouldUpdate) {
+              const safe = sanitiseDriveUrls(data, rawHyperlinks ?? [])
+              applyData(safe.data, safe.hyperlinks, rawFormatting ?? [])
+            }
           }
         }
       } catch {
@@ -167,7 +181,8 @@ export function useSheetData(tab: string, isContentView: boolean) {
           if (!data || data.length === 0) return
           await setIDBEntry(tab, data, rawHyperlinks ?? [], rawFormatting ?? [])
           cachedAtRef.current = Date.now()
-          applyData(data, rawHyperlinks ?? [], rawFormatting ?? [])
+          const safe = sanitiseDriveUrls(data, rawHyperlinks ?? [])
+          applyData(safe.data, safe.hyperlinks, rawFormatting ?? [])
         } catch {
           // Cache Storage unavailable or malformed — silently ignore
         }
