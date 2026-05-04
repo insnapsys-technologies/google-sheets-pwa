@@ -1,7 +1,7 @@
 ﻿import { getSheetTabs, fetchHeaderLogos, HeaderLogoEntry } from '@/lib/sheets'
 import CategoryGrid from './components/CategoryGrid'
 
-export const revalidate: number = parseInt(process.env.NEXT_PUBLIC_CACHE_REVALIDATE_TIME || '30', 10);
+export const revalidate: number = 30;
 
 export default async function Page() {
   let tabs: string[] = []
