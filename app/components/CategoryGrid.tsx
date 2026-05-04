@@ -8,6 +8,62 @@ export function toSlug(tab: string) {
   return tab.toLowerCase().replace(/\//g, '').replace(/\s+/g, '-')
 }
 
+function splitWords(input: string): string[] {
+  return input
+    // split camelCase / PascalCase → OintmentGlides → Ointment Glides
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    // normalize separators
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+}
+
+function normalizeWord(word: string): string {
+  // basic plural handling
+  if (word.endsWith('ies')) return word.slice(0, -3) + 'y'
+  if (word.endsWith('es')) return word.slice(0, -2)
+  if (word.endsWith('s') && word.length > 3) return word.slice(0, -1)
+  return word
+}
+
+function tokenize(s: string): string[] {
+  return splitWords(s).map(normalizeWord)
+}
+
+function matchTokens(a: string[], b: string[]): boolean {
+  return a.some(at =>
+    b.some(bt =>
+      at === bt ||
+      at.startsWith(bt) ||
+      bt.startsWith(at)
+    )
+  )
+}
+
+export function findLogoEntry(
+  tab: string,
+  logoMap: Record<string, HeaderLogoEntry>
+): HeaderLogoEntry | undefined {
+  // 1. Exact
+  if (logoMap[tab]) return logoMap[tab]
+
+  const trimmed = tab.trim()
+  if (logoMap[trimmed]) return logoMap[trimmed]
+
+  const tabTokens = tokenize(tab)
+
+  for (const [key, value] of Object.entries(logoMap)) {
+    const keyTokens = tokenize(key)
+
+    if (matchTokens(tabTokens, keyTokens)) {
+      return value
+    }
+  }
+
+  return undefined
+}
+
 interface Props {
   tabs: string[]
   logoMap?: Record<string, HeaderLogoEntry>
@@ -117,19 +173,15 @@ export default function CategoryGrid({ tabs, logoMap = {} }: Props) {
           }}
         >
           {tabs.slice(0, 8).map((tab, i) => {
-            const logoEntry = logoMap[tab.trim()];
-            // console.log(`[CategoryGrid] Processing tab "${tab}" with logoEntry:`, logoEntry, logoMap)
+            const logoEntry = findLogoEntry(tab, logoMap)
             const imageUrl = (logoEntry?.logoUrl) || TILE_IMAGES[tab] || ''
-            const tileRoute = logoEntry?.route || `/${toSlug(tab)}`
             const fallbackColor = TILE_FALLBACK_COLORS[i % TILE_FALLBACK_COLORS.length]
             const index = String(i + 1).padStart(2, '0')
-            // DEBUG
-            // console.log(`[CategoryGrid] tile "${tab}" — logoEntry:`, logoEntry, '| imageUrl:', imageUrl)
 
             return (
               <Link
                 key={tab}
-                href={tileRoute}
+                href={`/${toSlug(tab)}`}
                 className="gateway-tile"
                 style={{
                   minHeight: '220px',
@@ -259,16 +311,14 @@ export default function CategoryGrid({ tabs, logoMap = {} }: Props) {
             }}
           >
             {tabs.slice(8).map((tab, i) => {
-              const logoEntry = logoMap[tab.trim()];
-              // console.log(`[CategoryGrid] Processing overflow tab "${tab}" with logoEntry:`, logoEntry, logoMap)
+              const logoEntry = findLogoEntry(tab, logoMap)
               const overflowImageUrl = (logoEntry?.logoUrl) || TILE_IMAGES[tab] || ''
-              const overflowRoute = logoEntry?.route || `/${toSlug(tab)}`
               const fallbackColor = TILE_FALLBACK_COLORS[(i + 8) % TILE_FALLBACK_COLORS.length]
               const index = String(i + 9).padStart(2, '0')
               return (
                 <Link
                   key={tab}
-                  href={overflowRoute}
+                  href={`/${toSlug(tab)}`}
                   className="gateway-tile"
                   style={{
                     minHeight: '140px',
