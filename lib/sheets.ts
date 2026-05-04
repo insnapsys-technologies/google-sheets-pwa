@@ -55,7 +55,7 @@ export function driveProxyUrl(url: string | null | undefined): string | null {
 }
 
 /** Tab name patterns to hide from public listings (normalised, substring match) */
-export const HIDDEN_TAB_PATTERNS = ['newsletter'];
+export const HIDDEN_TAB_PATTERNS = ['newsletter', 'headerlogos'];
 
 export interface BlogPost {
   title: string;
@@ -147,6 +147,73 @@ export const fetchSheetWithLinks = async (
   );
 
   return { values, hyperlinks: convertedHyperlinks, formatting };
+};
+
+export type HeaderLogoEntry = {
+  logoUrl: string;
+  route: string;
+};
+
+export const fetchHeaderLogos = async (): Promise<Record<string, HeaderLogoEntry>> => {
+  try {
+    const wb = await getWorkbook();
+    // console.log('[fetchHeaderLogos] All sheet tab names:', wb.SheetNames);
+
+    const tabName = wb.SheetNames.find((n) => {
+      const norm = normaliseTab(n);
+      return norm.includes('header') && norm.includes('logo');
+    });
+    // console.log('[fetchHeaderLogos] Resolved HEADER LOGOS tab:', tabName ?? '(not found)');
+    if (!tabName) return {};
+
+    const ws = wb.Sheets[tabName];
+    if (!ws) {
+      // console.log('[fetchHeaderLogos] Worksheet object is null/undefined for tab:', tabName);
+      return {};
+    }
+
+    const rows: (string | null)[][] = XLSX.utils.sheet_to_json<(string | null)[]>(ws, {
+      header: 1,
+      defval: null,
+      raw: false,
+    });
+    // console.log('[fetchHeaderLogos] Total rows (incl. header):', rows.length);
+    if (rows.length < 2) {
+      // console.log('[fetchHeaderLogos] Not enough rows — aborting');
+      return {};
+    }
+
+    const rawHeaders = rows[0] as (string | null)[];
+    console.log('[fetchHeaderLogos] Raw header row:', rawHeaders);
+    const headers = rawHeaders.map((h) => (h ?? '').trim().toLowerCase());
+    const categoryIdx = headers.findIndex((h) => /category.?name/i.test(h));
+    const logoIdx = headers.findIndex((h) => /logo.?url/i.test(h));
+    const routeIdx = headers.findIndex((h) => /^route$/i.test(h));
+    // console.log('[fetchHeaderLogos] Column indices — category:', categoryIdx, '| logoUrl:', logoIdx, '| route:', routeIdx);
+
+    if (categoryIdx < 0) {
+      // console.log('[fetchHeaderLogos] "Category Name" column not found — check header spelling');
+      return {};
+    }
+
+    const map: Record<string, HeaderLogoEntry> = {};
+    for (const row of rows.slice(1)) {
+      const name = (row[categoryIdx] ?? '').trim();
+      if (!name) continue;
+      const rawLogoUrl = logoIdx >= 0 ? (row[logoIdx] ?? '') : '';
+      const resolvedUrl = driveProxyUrl(rawLogoUrl) ?? rawLogoUrl;
+      // console.log(`[fetchHeaderLogos] Row "${name}" — rawLogoUrl: "${rawLogoUrl}" → resolved: "${resolvedUrl}"`);
+      map[name] = {
+        logoUrl: resolvedUrl,
+        route: routeIdx >= 0 ? (row[routeIdx] ?? '') : '',
+      };
+    }
+    // console.log('[fetchHeaderLogos] Final logoMap keys:', Object.keys(map));
+    return map;
+  } catch (err) {
+    console.error('[fetchHeaderLogos] Unexpected error:', err);
+    return {};
+  }
 };
 
 const BLOG_TAB = process.env.BLOG_TAB_NAME || "Blog";

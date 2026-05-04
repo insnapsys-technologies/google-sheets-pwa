@@ -3,7 +3,7 @@ import DirectoryClient from '../components/DirectoryClient'
 import BlogUpdatesView from '../components/BlogUpdatesView'
 import { notFound } from 'next/navigation'
 
-export const revalidate = 30
+export const revalidate = 30;
 
 function toSlug(tab: string) {
  return tab
