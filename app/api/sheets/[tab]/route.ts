@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchSheetWithLinks, HIDDEN_TAB_PATTERNS } from "@/lib/sheets";
 
-export const revalidate = 30;
+export const revalidate = process.env.NEXT_PUBLIC_CACHE_REVALIDATE_TIME || 30;
 
 const normaliseTab = (s: string) => s.toLowerCase().replace(/\s+/g, '')
 

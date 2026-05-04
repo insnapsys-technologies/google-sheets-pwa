@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSheetTabs } from "@/lib/sheets";
 
-export const revalidate = 30;
+export const revalidate = process.env.NEXT_PUBLIC_CACHE_REVALIDATE_TIME || 30;
 
 export async function GET() {
   try {

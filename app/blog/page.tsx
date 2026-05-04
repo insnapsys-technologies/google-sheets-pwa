@@ -1,6 +1,6 @@
 import BlogUpdatesView from '@/app/components/BlogUpdatesView'
 
-export const revalidate = 30;
+export const revalidate = process.env.NEXT_PUBLIC_CACHE_REVALIDATE_TIME || 30;
 
 const BLOG_TAB = process.env.BLOG_TAB_NAME || 'Blog'
 

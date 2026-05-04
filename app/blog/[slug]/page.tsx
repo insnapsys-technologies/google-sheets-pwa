@@ -2,7 +2,7 @@ import { fetchBlogPosts } from '@/lib/sheets'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-export const revalidate = 30;
+export const revalidate = process.env.NEXT_PUBLIC_CACHE_REVALIDATE_TIME || 30;
 
 export default async function BlogPostPage({
   params,

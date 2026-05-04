@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { TILE_IMAGES, TILE_FALLBACK_COLORS } from '@/app/config/tile-images'
+import type { HeaderLogoEntry } from '@/lib/sheets'
 
 export function toSlug(tab: string) {
   return tab.toLowerCase().replace(/\//g, '').replace(/\s+/g, '-')
@@ -9,11 +10,15 @@ export function toSlug(tab: string) {
 
 interface Props {
   tabs: string[]
+  logoMap?: Record<string, HeaderLogoEntry>
 }
 
 // 2-col uniform dashboard grid — all breakpoints including mobile
 
-export default function CategoryGrid({ tabs }: Props) {
+export default function CategoryGrid({ tabs, logoMap = {} }: Props) {
+  // DEBUG — visible in browser DevTools console
+  // console.log('[CategoryGrid] tabs received:', tabs)
+  // console.log('[CategoryGrid] logoMap received:', logoMap)
   return (
     <main style={{ background: 'var(--background)', minHeight: '100vh' }}>
       {/* ── Header: Mission Statement ─────────────────────────── */}
@@ -112,14 +117,19 @@ export default function CategoryGrid({ tabs }: Props) {
           }}
         >
           {tabs.slice(0, 8).map((tab, i) => {
-            const imageUrl = TILE_IMAGES[tab] || ''
+            const logoEntry = logoMap[tab.trim()];
+            // console.log(`[CategoryGrid] Processing tab "${tab}" with logoEntry:`, logoEntry, logoMap)
+            const imageUrl = (logoEntry?.logoUrl) || TILE_IMAGES[tab] || ''
+            const tileRoute = logoEntry?.route || `/${toSlug(tab)}`
             const fallbackColor = TILE_FALLBACK_COLORS[i % TILE_FALLBACK_COLORS.length]
             const index = String(i + 1).padStart(2, '0')
+            // DEBUG
+            // console.log(`[CategoryGrid] tile "${tab}" — logoEntry:`, logoEntry, '| imageUrl:', imageUrl)
 
             return (
               <Link
                 key={tab}
-                href={`/${toSlug(tab)}`}
+                href={tileRoute}
                 className="gateway-tile"
                 style={{
                   minHeight: '220px',
@@ -249,28 +259,43 @@ export default function CategoryGrid({ tabs }: Props) {
             }}
           >
             {tabs.slice(8).map((tab, i) => {
+              const logoEntry = logoMap[tab.trim()];
+              // console.log(`[CategoryGrid] Processing overflow tab "${tab}" with logoEntry:`, logoEntry, logoMap)
+              const overflowImageUrl = (logoEntry?.logoUrl) || TILE_IMAGES[tab] || ''
+              const overflowRoute = logoEntry?.route || `/${toSlug(tab)}`
               const fallbackColor = TILE_FALLBACK_COLORS[(i + 8) % TILE_FALLBACK_COLORS.length]
               const index = String(i + 9).padStart(2, '0')
               return (
                 <Link
                   key={tab}
-                  href={`/${toSlug(tab)}`}
+                  href={overflowRoute}
                   className="gateway-tile"
                   style={{
                     minHeight: '140px',
                     position: 'relative',
                     display: 'block',
                     overflow: 'hidden',
-                    background: fallbackColor,
+                    background: overflowImageUrl ? 'transparent' : fallbackColor,
                     cursor: 'pointer',
                     textDecoration: 'none',
                   }}
                 >
+                  {overflowImageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={overflowImageUrl}
+                      alt=""
+                      aria-hidden="true"
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
+                    />
+                  )}
                   <div
                     style={{
                       position: 'absolute',
                       inset: 0,
-                      background: 'linear-gradient(160deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0) 100%)',
+                      background: overflowImageUrl
+                        ? 'rgba(0,0,0,0.55)'
+                        : 'linear-gradient(160deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0) 100%)',
                     }}
                   />
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '1rem' }}>
